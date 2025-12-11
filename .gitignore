@@ -1,5 +1,40 @@
-db.sqlite3
+# Python cache
 __pycache__/
 *.pyc
-env/
+*.pyo
+*.pyd
+
+# Environment files
 .env
+env/
+venv/
+.venv/
+
+# OS files
+.DS_Store
+
+# SQLite (not used, but good to ignore)
+db.sqlite3
+
+# Django static + media (generated)
+staticfiles/
+media/
+
+# Logs
+*.log
+
+# IDE settings
+.vscode/
+.idea/
+
+# Node packages (if ever added)
+node_modules/
+
+# Compiled assets (optional future frontend)
+dist/
+build/
+
+# PostgreSQL dump files
+*.sql
+*.dump
+*.backup

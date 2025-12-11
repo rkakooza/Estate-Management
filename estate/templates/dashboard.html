@@ -1,0 +1,493 @@
+{% load currency %}
+<!DOCTYPE html>
+
+<html>
+
+<head>
+  <title>Estate Dashboard</title>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" />
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/flatpickr/dist/flatpickr.min.css" />
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/flatpickr/dist/plugins/monthSelect/style.css" />
+  <style>
+      body {
+          background: #e9efe8;
+          font-family: "Inter", sans-serif;
+      }
+      .dashboard-wrapper { padding: 20px 0; }
+      .greeting-card {
+          background: linear-gradient(135deg, #f5f8f5, #e8efe8);
+          padding: 30px;
+          border-radius: 24px;
+          margin-bottom: 24px;
+          box-shadow: 0 4px 12px rgba(0,0,0,0.05);
+      }
+      .greeting-title { font-size: 28px; font-weight: 700; }
+      .greeting-subtitle { color: #576b5c; font-size: 16px; }
+      .dashboard-card {
+          background: #ffffff;
+          border-radius: 22px;
+          padding: 24px;
+          box-shadow: 0 6px 16px rgba(0,0,0,0.06);
+          transition: 0.2s ease;
+      }
+      .dashboard-card:hover { transform: translateY(-3px); }
+      .dashboard-title { font-size: 16px; font-weight: 600; color: #6a6f69; }
+      .dashboard-value { font-size: 30px; font-weight: 700; color: #2d5b3a; }
+      .grid { display: grid; grid-gap: 24px; }
+      .grid-3 { grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); }
+      .chart-card {
+          padding: 20px;
+          border-radius: 22px;
+          background: #ffffff;
+          box-shadow: 0 4px 14px rgba(0,0,0,0.05);
+      }
+      .sidebar {
+          width: 70px;
+          position: fixed;
+          top: 0; left: 0; bottom: 0;
+          background: #ffffff;
+          padding: 20px 0;
+          box-shadow: 4px 0 20px rgba(0,0,0,0.05);
+          display: flex; flex-direction: column;
+          gap: 26px; align-items: center;
+          z-index: 100;
+      }
+      .sidebar-icon {
+          width: 40px; height: 40px;
+          border-radius: 12px;
+          background: #eff5ef;
+          display: flex; justify-content: center; align-items: center;
+          cursor: pointer; transition: 0.2s;
+      }
+      .sidebar-icon:hover { background: #dfe9df; }
+      .content { margin-left: 100px; }
+  </style>
+</head>
+
+<body>
+  <div class="sidebar">
+      <div class="sidebar-icon">🏠</div>
+      <div class="sidebar-icon">📊</div>
+      <div class="sidebar-icon">💸</div>
+      <div class="sidebar-icon">👥</div>
+      <div class="sidebar-icon">⚙️</div>
+  </div>
+  <div class="content">
+  <nav class="navbar navbar-expand-lg navbar-dark bg-dark">
+    <div class="container-fluid">
+      <a class="navbar-brand" href="/dashboard/">Estate Manager</a>
+
+      <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav">
+        <span class="navbar-toggler-icon"></span>
+      </button>
+
+      <div class="collapse navbar-collapse" id="navbarNav">
+        <ul class="navbar-nav ms-auto">
+          <li class="nav-item">
+            <a class="nav-link active" href="/dashboard/">Dashboard</a>
+          </li>
+          <li class="nav-item">
+            <a class="nav-link" href="/admin/">Admin Panel</a>
+          </li>
+          <li class="nav-item">
+            <a class="nav-link" href="/admin/logout/">Logout</a>
+          </li>
+        </ul>
+      </div>
+    </div>
+  </nav>
+
+  <div class="container mt-4">
+    <div class="greeting-card">
+        <!-- <div class="greeting-title">Hello, {{ user.get_full_name|default:user.username }}! </div> -->
+        <div class="greeting-title">
+            Hello,
+            {% if user.first_name %}
+                {{ user.first_name }}!
+            {% else %}
+                {{ user.username }}!
+            {% endif %}
+        </div>
+    </div>
+    <div class="alert alert-info d-flex justify-content-between align-items-center mt-3">
+      <div>
+        <strong>Viewing:</strong>
+        {{ selected_property_name }} — {{ selected_month_label }}
+      </div>
+
+      <a href="/dashboard/" class="btn btn-sm btn-outline-danger">
+        Clear Filters
+      </a>
+    </div>
+    <form method="get" class="row mb-4">
+      <div class="col-md-4">
+        <label for="property" class="form-label">Filter by Property</label>
+        <select name="property" id="property" class="form-select">
+          <option value="">All Properties</option>
+          {% for prop in all_properties %}
+          <option value="{{ prop.id }}" {% if selected_property == prop.id %}selected{% endif %}>
+            {{ prop.name }}
+          </option>
+          {% endfor %}
+        </select>
+      </div>
+
+      <div class="col-md-4">
+        <label for="month" class="form-label">Filter by Month</label>
+       <input 
+          type="text" 
+          id="monthPicker" 
+          name="month" 
+          class="form-control"
+          placeholder="Select month..."
+          value="{% if selected_month %}{{ selected_month }}{% else %}{{ current_month_date|date:'Y-m' }}{% endif %}"
+      />
+      </div>
+
+      <div class="col-md-4 d-flex align-items-end">
+        <button type="submit" class="btn btn-primary w-100 mt-2">
+          Apply Filters
+        </button>
+      </div>
+    </form>
+
+    <div class="grid grid-3">
+
+        <div class="dashboard-card">
+            <div class="dashboard-title">Total Rent</div>
+            <div class="dashboard-value">{{ total_rent|ugx }}</div>
+        </div>
+
+        <div class="dashboard-card">
+            <div class="dashboard-title">Total Expenses</div>
+            <div class="dashboard-value">{{ total_expenses|ugx }}</div>
+        </div>
+    <div class="dashboard-card mb-4">
+      <h3 class="dashboard-title">Available Funds (All-Time)</h3>
+      <div class="dashboard-value">{{ available_funds|ugx }}</div>
+      <p class="text-muted mt-2">Total cumulative funds.</p>
+    </div>
+
+    </div>
+
+    <div class="dashboard-card mb-4">
+      <h3 class="card-title">Per-Property Summary</h3>
+      <table class="table table-striped">
+        <thead>
+          <tr>
+            <th>Property</th>
+            <th>Total Rent</th>
+            <th>Total Expenses</th>
+            <th>Profit</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for prop in property_summaries %}
+          <tr>
+            <td>{{ prop.name }}</td>
+            <td>{{ prop.rent_total|ugx }}</td>
+            <td>{{ prop.expense_total|ugx }}</td>
+            <td>{{ prop.profit|ugx }}</td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+
+    <div class="dashboard-card mb-4">
+      <h3 class="card-title">Monthly Financial Summary</h3>
+      <table class="table table-bordered table-hover">
+        <thead>
+          <tr>
+            <th>Month</th>
+            <th>Total Rent</th>
+            <th>Total Expenses</th>
+            <th>Profit</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for m in monthly_data %}
+          <tr>
+            <td>{{ m.month|date:"F Y" }}</td>
+            <td>{{ m.rent|ugx }}</td>
+            <td>{{ m.expense|ugx }}</td>
+            <td>{{ m.profit|ugx }}</td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+
+    <div class="dashboard-card mb-4">
+      <h3 class="card-title">Tenants Late This Month</h3>
+      {% if late_tenants %}
+      <ul class="list-group">
+        {% for tenant in late_tenants %}
+        <li class="list-group-item">
+          <strong>{{ tenant.name }}</strong> — {{ tenant.property.name }}
+          <span class="text-muted">(Rent: {{ tenant.monthly_rent|ugx }})</span>
+        </li>
+        {% endfor %}
+      </ul>
+      {% else %}
+      <p class="text-success">
+        No tenants are currently late for this month.
+      </p>
+      {% endif %}
+    </div>
+
+    <div class="dashboard-card mb-4">
+      <h5 class="mb-0 text-dark">Outstanding Tenants (Balance Owed)</h5>
+      <div class="p-0">
+        {% if tenant_payment_status|length == 0 %}
+        <p class="p-3 mb-0">No tenants found.</p>
+        {% else %}
+        <table class="table table-sm mb-0">
+          <thead>
+            <tr>
+              <th>Tenant</th>
+              <th>Property</th>
+              <th>Missed Months</th>
+              <th>Status</th>
+              <th>Balance Due</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for item in tenant_payment_status %} {% if item.balance > 0 %}
+            <tr>
+              <td>{{ item.tenant.name }}</td>
+              <td>{{ item.tenant.property.name }}</td>
+              <td>
+                {% for m in item.missed_month_names %}
+                  <span class="badge bg-danger">{{ m }}</span>
+                {% endfor %}
+              </td>
+              <td>{{ item.status_type }}</td>
+              <td class="text-danger fw-bold">{{ item.balance|ugx }}</td>
+            </tr>
+            {% endif %} {% endfor %}
+          </tbody>
+          <tfoot>
+            <tr>
+              <th colspan="5"></th>
+            </tr>
+          </tfoot>
+        </table>
+        {% endif %}
+      </div>
+    </div>
+
+    <div class="dashboard-card mb-4">
+      <h5 class="mb-0">Tenant Payment Breakdown</h5>
+      <div class="p-0">
+        <table class="table table-striped mb-0">
+          <thead class="table-light">
+            <tr>
+              <th>Tenant</th>
+              <th>Property</th>
+              <th>Rent Due</th>
+              <th>Paid</th>
+              <th>Balance</th>
+              <th>Status</th>
+              <th>Add Payment</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for item in tenant_payment_status %}
+            <tr class="{% if not item.is_paid %}table-danger{% else %}table-success{% endif %}">
+              <td>{{ item.tenant.name }}</td>
+              <td>{{ item.tenant.property.name }}</td>
+              <td>{{ item.rent_due|ugx }}</td>
+              <td>{{ item.paid|ugx }}</td>
+              <td>
+                {% if item.balance > 0 %}
+                <span class="text-danger fw-bold">{{ item.balance|ugx }}</span>
+                {% else %}
+                <span class="text-success fw-bold">0</span>
+                {% endif %}
+              </td>
+              <td>
+                <span class="badge 
+                  {% if item.status_type == 'On Time' %}bg-success
+                  {% elif item.status_type == 'Partial' %}bg-warning text-dark
+                  {% elif item.status_type == 'Missed' %}bg-danger
+                  {% elif item.status_type == 'Cumulative' %}bg-dark
+                  {% endif %}
+                ">{{ item.status_type }}</span>
+              </td>
+              <td>
+                <a href="/admin/estate/rentpayment/add/?tenant={{ item.tenant.id }}" class="btn btn-sm btn-primary">
+                  Add Payment
+                </a>
+              </td>
+            </tr>
+            {% endfor %}
+          </tbody>
+          <tfoot class="table-light">
+            <tr>
+              <th colspan="2">Totals:</th>
+              <!-- Total rent due for all tenants -->
+              <th>{{ total_rent_due|ugx }}</th>
+              <!-- Total paid -->
+              <th>{{ total_paid|ugx }}</th>
+              <!-- Total outstanding balance -->
+              <th>{{ total_balance|ugx }}</th>
+              <th colspan="2"></th>
+            </tr>
+          </tfoot>
+        </table>
+      </div>
+    </div>
+
+    <div class="dashboard-card mb-4">
+      <h3 class="card-title">Expense Breakdown</h3>
+      <p>
+        <strong>Recurring Expenses:</strong> {{ recurring_expenses|ugx }}
+      </p>
+      <p><strong>One-Time Expenses:</strong> {{ one_time_expenses|ugx }}</p>
+    </div>
+
+    <div class="dashboard-card mb-4">
+      <h3 class="card-title">Expenses by Category</h3>
+      <table class="table table-striped">
+        <thead>
+          <tr>
+            <th>Category</th>
+            <th>Total Amount</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for cat in category_summaries %}
+          <tr>
+            <td>{{ cat.name }}</td>
+            <td>{{ cat.total|ugx }}</td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+
+    <div class="chart-card mb-4">
+        <h3 class="dashboard-title mb-3">Monthly Rent, Expenses & Profit</h3>
+        <canvas id="combinedChart" height="140"></canvas>
+    </div>
+
+    <script>
+      // Convert Django data into JavaScript arrays
+      const chartLabels = [
+        {% for m in monthly_data %}
+      "{{ m.month|date:'F Y' }}",
+        {% endfor %}];
+
+      const chartRent = [
+        {% for m in monthly_data %}
+          {{ m.rent }},
+        {% endfor %}
+      ];
+
+      const chartExpenses = [
+        {% for m in monthly_data %}
+          {{ m.expense }},
+        {% endfor %}
+      ];
+
+      const chartProfit = [
+        {% for m in monthly_data %}
+          {{ m.profit }},
+        {% endfor %}
+      ];
+    </script>
+
+    <script>
+      const combinedCtx = document.getElementById("combinedChart").getContext("2d");
+
+      const combinedChart = new Chart(combinedCtx, {
+        type: "bar",
+        data: {
+          labels: chartLabels,
+          datasets: [
+            {
+              label: "Rent Collected",
+              data: chartRent,
+              backgroundColor: "rgba(54, 162, 235, 0.6)",
+              yAxisID: "y1"
+            },
+            {
+              label: "Expenses",
+              data: chartExpenses,
+              backgroundColor: "rgba(255, 99, 132, 0.6)",
+              yAxisID: "y1"
+            },
+            {
+              label: "Profit",
+              data: chartProfit,
+              type: "line",
+              borderColor: "rgba(75, 192, 192, 1)",
+              borderWidth: 3,
+              tension: 0.25,
+              fill: false,
+              yAxisID: "y2"
+            }
+          ]
+        },
+        options: {
+          responsive: true,
+          interaction: {
+            mode: "index",
+            intersect: false
+          },
+          plugins: {
+            tooltip: {
+              callbacks: {
+                label: function(context) {
+                  let label = context.dataset.label || "";
+                  let value = context.raw || 0;
+                  // Format as UGX with commas
+                  let formatted = "UGX " + value.toString().replace(/\B(?=(\d{3})+(?!\d))/g, ",");
+                  return label + ": " + formatted;
+                }
+              }
+            }
+          },
+          stacked: false,
+          scales: {
+            y1: {
+              type: "linear",
+              position: "left",
+              beginAtZero: true
+            },
+            y2: {
+              type: "linear",
+              position: "right",
+              beginAtZero: true,
+              grid: {
+                drawOnChartArea: false
+              }
+            }
+          }
+        }
+      });
+    </script>
+
+    <p>This is your dashboard. Data will be added here soon.</p>
+  </div>
+</div> <!-- close content wrapper -->
+  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/flatpickr"></script>
+  <script src="https://cdn.jsdelivr.net/npm/flatpickr/dist/plugins/monthSelect/index.js"></script>
+  <script>
+  flatpickr("#monthPicker", {
+      plugins: [
+          new monthSelectPlugin({
+              shorthand: true, 
+              dateFormat: "Y-m",  // what gets sent to Django
+              altFormat: "F Y"    // what users see
+          })
+      ],
+      defaultDate: "{% if selected_month %}{{ selected_month }}{% else %}{{ current_month_date|date:'Y-m' }}{% endif %}"
+  });
+  </script>
+</body>
+
+</html>
