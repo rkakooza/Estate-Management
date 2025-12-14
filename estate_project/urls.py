@@ -16,9 +16,17 @@ Including another URLconf
 """
 from django.contrib import admin
 from django.urls import path
-from estate.views import dashboard
+from estate import views
+from django.contrib.auth import views as auth_views
 
 urlpatterns = [
     path('admin/', admin.site.urls),
-    path('dashboard/', dashboard, name='dashboard'),
+    path('dashboard/', views.dashboard, name='dashboard'),
+    path('analytics/', views.analytics_view, name='analytics'),
+    path('payments/', views.payments_view, name='payments'),
+    path("payments/add/", views.add_payment, name="add_payment"),
+    path('tenants/', views.tenants_view, name='tenants'),
+    path('settings/', views.settings_view, name='settings'),
+    path("logout/", auth_views.LogoutView.as_view(next_page="/admin/login/", http_method_names=["get"]),
+    name="logout"),
 ]

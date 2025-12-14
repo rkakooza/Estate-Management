@@ -1,0 +1,317 @@
+/* ============================================================
+   GLOBAL THEME + RESET
+============================================================ */
+body {
+   background: #eef3ee;
+   font-family: "Inter", sans-serif;
+   margin: 0;
+   padding: 0;
+}
+
+main.content {
+   margin-left: 80px;
+   /* sidebar width */
+   padding: 32px;
+}
+
+/* Smooth transitions globally */
+* {
+   transition: 0.2s ease;
+}
+
+/* ============================================================
+   TYPOGRAPHY
+============================================================ */
+h1,
+h2,
+h3,
+h4,
+h5,
+h6 {
+   font-weight: 700;
+   color: #2d4032;
+}
+
+.text-muted {
+   color: #6c7a6c !important;
+}
+
+/* ============================================================
+   SIDEBAR
+============================================================ */
+.sidebar {
+   width: 80px;
+   position: fixed;
+   top: 0;
+   bottom: 0;
+   left: 0;
+   background: #ffffff;
+   padding: 32px 0;
+   display: flex;
+   flex-direction: column;
+   align-items: center;
+   gap: 32px;
+   box-shadow: 4px 0 20px rgba(0, 0, 0, 0.05);
+   border-right: 1px solid #dde6dd;
+   z-index: 1100;
+}
+
+.sidebar-title {
+   font-size: 15px;
+   font-weight: 600;
+   text-align: center;
+   color: #4a5e4a;
+}
+
+.nav-link {
+   width: 100%;
+   text-align: center;
+   padding: 14px 0;
+   color: #5f6e5f !important;
+   font-size: 13px;
+}
+
+.nav-link:hover {
+   background: #e9efe8;
+   color: #2c4d2c !important;
+}
+
+.nav-link.active {
+   background: #d7ead7 !important;
+   color: #1f3d1f !important;
+   font-weight: 700;
+   border-right: 4px solid #2d5b3a;
+}
+
+.sidebar-divider {
+   border-color: #d8e3d8;
+   width: 70%;
+   margin: auto;
+}
+
+/* ============================================================
+   GREETING CARD
+============================================================ */
+.greeting-card {
+   background: linear-gradient(135deg, #f6faf6, #eaf2ea);
+   padding: 32px;
+   border-radius: 24px;
+   margin-bottom: 28px;
+   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
+}
+
+.greeting-title {
+   font-size: 30px;
+   font-weight: 700;
+   color: #2d4b2f;
+}
+
+.greeting-subtitle {
+   color: #5f6f5f;
+   font-size: 16px;
+}
+
+/* ============================================================
+   DASHBOARD METRIC CARDS
+============================================================ */
+.dashboard-card {
+   background: #ffffff;
+   border-radius: 20px;
+   padding: 24px;
+   box-shadow: 0 6px 16px rgba(0, 0, 0, 0.07);
+   transition: transform 0.2s ease;
+}
+
+.dashboard-card:hover {
+   transform: translateY(-4px);
+}
+
+.dashboard-title {
+   font-size: 15px;
+   font-weight: 600;
+   color: #647564;
+}
+
+.dashboard-value {
+   font-size: 32px;
+   font-weight: 700;
+   color: #2d5b3a;
+}
+
+/* ============================================================
+   GRID LAYOUTS
+============================================================ */
+.grid {
+   display: grid;
+   gap: 24px;
+}
+
+.grid-3 {
+   grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+}
+
+/* ============================================================
+   CHART CARDS
+============================================================ */
+.chart-card {
+   padding: 20px;
+   border-radius: 22px;
+   background: #ffffff;
+   box-shadow: 0 4px 14px rgba(0, 0, 0, 0.06);
+}
+
+/* ============================================================
+   TABLES (Payments / Tenants / Analytics)
+============================================================ */
+.table-custom {
+   background: white;
+   border-radius: 20px;
+   overflow: hidden;
+   box-shadow: 0 5px 14px rgba(0, 0, 0, 0.07);
+}
+
+.table-custom thead {
+   background: #e9f3e9;
+   color: #2c4d2c;
+   font-weight: 600;
+}
+
+.table-custom tbody tr:hover {
+   background: #f3f8f3;
+}
+
+.table-custom td {
+   padding: 12px;
+   vertical-align: middle;
+   font-size: 14px;
+}
+
+/* Status badges */
+.badge-paid {
+   background: #c7f2c7;
+   color: #265b2e;
+}
+
+.badge-partial {
+   background: #fff4c2;
+   color: #8a6d00;
+}
+
+.badge-unpaid {
+   background: #ffd7d7;
+   color: #a11a1a;
+}
+
+/* ============================================================
+   BUTTON ENHANCEMENTS
+============================================================ */
+.btn-main {
+   background: #2d5b3a;
+   color: white;
+   border-radius: 10px;
+}
+
+.btn-main:hover {
+   background: #244a2e;
+}
+
+.btn-outline-main {
+   border-color: #2d5b3a;
+   color: #2d5b3a;
+}
+
+.btn-outline-main:hover {
+   background: #2d5b3a;
+   color: white;
+}
+
+/* ============================================================
+   FORMS
+============================================================ */
+.form-control:focus,
+.form-select:focus {
+   border-color: #2d5b3a;
+   box-shadow: 0 0 0 0.2rem rgba(45, 91, 58, 0.25);
+}
+
+/* ============================================================
+   RESPONSIVE
+============================================================ */
+@media (max-width: 768px) {
+   .sidebar {
+      width: 70px;
+   }
+
+   main.content {
+      margin-left: 70px;
+      padding: 18px;
+   }
+}
+
+/* ============================================================
+   DASHBOARD EXTENSIONS (Soft Green Estate Theme)
+============================================================ */
+
+/* Dashboard card spacing normalization */
+.dashboard-card.mb-4 {
+   margin-bottom: 32px !important;
+}
+
+/* List group items (Late Tenants list) */
+.list-group-item {
+   border: none;
+   padding: 14px 18px;
+   background: #f9fbf9;
+   margin-bottom: 6px;
+   border-radius: 12px;
+   box-shadow: 0 2px 6px rgba(0, 0, 0, 0.04);
+}
+
+.list-group-item strong {
+   color: #2d4b2f;
+}
+
+/* Badge overrides using soft green palette */
+.badge.bg-danger {
+   background: #ffcccc !important;
+   color: #8a1a1a !important;
+}
+
+.badge.bg-success {
+   background: #c7f2c7 !important;
+   color: #1f4d1f !important;
+}
+
+.badge.bg-warning {
+   background: #fff4c2 !important;
+   color: #8a6d00 !important;
+}
+
+.badge.bg-dark {
+   background: #2d4032 !important;
+   color: #ffffff !important;
+}
+
+/* Table row status colors for payment breakdown */
+.table-danger {
+   background: #ffecec !important;
+}
+
+.table-success {
+   background: #e9f7e9 !important;
+}
+
+/* Titles & values refinement */
+.dashboard-title {
+   color: #3b5840;
+   letter-spacing: 0.3px;
+}
+
+.dashboard-value {
+   color: #1e4a2a;
+}
+
+/* Expense breakdown text styling */
+.dashboard-card p strong {
+   color: #2d4b2f;
+}
