@@ -4,133 +4,140 @@
 {% block content %}
 
 <div class="dashboard-card mb-4" style="max-width: 700px; margin: auto;">
- <h2 class="dashboard-title mb-3">
-  Add Rent Payment
- </h2>
+  <h2 class="dashboard-title mb-3">
+    Add Rent Payment
+  </h2>
 
- <!-- Tenant Summary -->
- <div class="mb-4 p-3 rounded" style="background:#f6faf6;">
-  <p class="mb-1">
-   <strong>Tenant:</strong> {{ tenant.name }}
-  </p>
-  <p class="mb-1">
-   <strong>Property:</strong> {{ tenant.property.name }}
-  </p>
-  <p class="mb-1">
-   <strong>Payment For:</strong>
-   <span id="paymentForLabel">
-    {{ selected_month_label|default:"Not selected" }}
-   </span>
-  </p>
-  <p class="mb-0">
-   <strong>Monthly Rent:</strong> {{ tenant.monthly_rent|ugx }}
-  </p>
- </div>
-
- {% if outstanding_months %}
- <div class="alert border border-danger-subtle border-4 rounded-4 mb-4"
-  style="background:#f6faf7; border-color:#c0392b;">
-  <strong>Outstanding Rent Information:</strong>
-
-  <div class="mt-2">
-   {% for item in outstanding_months %}
-   <div class="mb-1">
-    {% if item.type == "partial" %}
-    <span class="badge bg-warning text-dark me-2">Partial Payment Received</span>
-    <span>
-     {{ item.label }} —
-     Remaining Balance:
-     <strong>{{ item.remaining|ugx }}</strong>
-    </span>
-    {% else %}
-    <span class="badge bg-danger me-2">Full Payment Required</span>
-    <span>{{ item.label }}</span>
-    {% endif %}
-   </div>
-   {% endfor %}
+  <!-- Tenant Summary -->
+  <div class="mb-4 p-3 rounded" style="background:#f6faf6;">
+    <p class="mb-1">
+      <strong>Tenant:</strong> {{ tenant.name }}
+    </p>
+    <p class="mb-1">
+      <strong>Property:</strong> {{ tenant.property.name }}
+    </p>
+    <p class="mb-1">
+      <strong>Payment For:</strong>
+      <span id="paymentForLabel">
+        {{ selected_month_label|default:"Not selected" }}
+      </span>
+    </p>
+    <p class="mb-0">
+      <strong>Monthly Rent:</strong> {{ monthly_rent|ugx }}
+    </p>
   </div>
 
-  <small class="d-block mt-2 text-muted">
-   Recommended: apply payments starting from the oldest missed month.
-  </small>
- </div>
- {% endif %}
+  {% if outstanding_months %}
+  <div class="alert border border-danger-subtle border-4 rounded-4 mb-4"
+    style="background:#f6faf7; border-color:#c0392b;">
+    <strong>Outstanding Rent Information:</strong>
 
- <!-- Payment Form (UI only for now) -->
- <form method="post">
-  {% csrf_token %}
+    <div class="mt-2">
+      {% for item in outstanding_months %}
+      <div class="mb-1">
+        {% if item.type == "partial" %}
+        <span class="badge bg-warning text-dark me-2">Partial Payment Received</span>
+        <span>
+          {{ item.label }} —
+          Remaining Balance:
+          <strong>{{ item.remaining|ugx }}</strong>
+        </span>
+        {% else %}
+        <span class="badge bg-danger me-2">Full Payment Required</span>
+        <span>{{ item.label }}</span>
+        {% endif %}
+      </div>
+      {% endfor %}
+    </div>
 
-  <div class="mb-3">
-   <label class="form-label">Payment For</label>
-
-   <!-- Display input -->
-   <input type="text" id="monthPickerDisplay" class="form-control" placeholder="Select month..." readonly>
-
-   <!-- Actual value sent to backend -->
-   <input type="hidden" id="monthPicker" name="month" value="{% if selected_month %}{{ selected_month }}{% endif %}"
-    required>
+    <small class="d-block mt-2 text-muted">
+      Recommended: apply payments starting from the oldest missed month.
+    </small>
   </div>
+  {% endif %}
 
-  <div class="mb-3">
-   <label class="form-label">Amount Paid</label>
-   <input type="number" name="amount" class="form-control" step="0.01" min="0.01" required>
-   <small class="text-muted">
-    Enter any amount. Payments are allocated automatically starting from the oldest unpaid month.
-   </small>
-  </div>
+  <!-- Payment Form (UI only for now) -->
+  <form method="post">
+    {% csrf_token %}
 
-  <div class="mb-3">
-   <label class="form-label">Payment Date</label>
-   <input type="date" name="payment_date" class="form-control" required>
-  </div>
+    <div class="mb-3">
+      <label class="form-label">Payment For</label>
 
-  <div class="d-flex gap-3 mt-4">
-   <button type="submit" class="btn btn-main">
-    Save Payment
-   </button>
+      <!-- Display input -->
+      <input type="text" id="monthPickerDisplay" class="form-control" placeholder="Select month..." readonly>
 
-   <a href="{% url 'payments' %}" class="btn btn-outline-main">
-    Cancel
-   </a>
-  </div>
- </form>
+      <!-- Actual value sent to backend -->
+      <input type="hidden" id="monthPicker" name="month" value="{% if selected_month %}{{ selected_month }}{% endif %}"
+        required>
+    </div>
+
+    <div class="mb-3">
+      <label class="form-label">Amount Paid</label>
+      <input type="number" name="amount" class="form-control" step="0.01" min="0.01" required>
+      <small class="text-muted">
+        Enter any amount. Payments are allocated automatically starting from the oldest unpaid month.
+      </small>
+    </div>
+
+    <div class="mb-3">
+      <label class="form-label">Payment Date</label>
+      <input type="date" name="payment_date" class="form-control" required>
+    </div>
+
+    <div class="d-flex gap-3 mt-4">
+      <button type="submit" class="btn btn-main">
+        Save Payment
+      </button>
+
+      <a href="{% url 'payments' %}" class="btn btn-outline-main">
+        Cancel
+      </a>
+    </div>
+  </form>
 </div>
+
 
 {% endblock %}
 
 {% block scripts %}
 <script>
- flatpickr("#monthPickerDisplay", {
-  plugins: [
-   new monthSelectPlugin({
-    shorthand: false,
-    dateFormat: "Y-m",
-    altFormat: "F Y"
-   })
-  ],
-  defaultDate: "{% if selected_month %}{{ selected_month }}{% else %}{{ current_month_date|date:'Y-m' }}{% endif %}",
-  onChange: function (selectedDates, dateStr, instance) {
-   document.getElementById("monthPicker").value = dateStr;
+  flatpickr("#monthPickerDisplay", {
+    altInput: true,
+    altFormat: "F Y",
+    plugins: [
+      new monthSelectPlugin({
+        shorthand: false,
+        dateFormat: "Y-m"
+      })
+    ],
+    defaultDate: "{% if selected_month %}{{ selected_month }}{% else %}{{ current_month_date|date:'Y-m' }}{% endif %}",
+    onChange: function (selectedDates, dateStr, instance) {
+      document.getElementById("monthPicker").value = dateStr;
 
-   const formatted = instance.formatDate(selectedDates[0], "F Y");
-   instance.input.value = formatted;
+      const formatted = instance.formatDate(selectedDates[0], "F Y");
+      // instance.input.value = formatted;
 
-   const label = document.getElementById("paymentForLabel");
-   if (label) {
-    label.textContent = formatted;
-   }
-  },
-  onReady: function (selectedDates, dateStr, instance) {
-   if (selectedDates.length) {
-    const formatted = instance.formatDate(selectedDates[0], "F Y");
-    instance.input.value = formatted;
+      const label = document.getElementById("paymentForLabel");
+      if (label) {
+        label.textContent = formatted;
+      }
 
-    const label = document.getElementById("paymentForLabel");
-    if (label) {
-     label.textContent = formatted;
+      const url = new URL(window.location.href);
+      url.searchParams.set("month", dateStr);
+      url.searchParams.set("tenant", "{{ tenant.id }}");
+      window.location.href = url.toString();
+      // },
+      // onReady: function (selectedDates, dateStr, instance) {
+      //   if (selectedDates.length) {
+      //     const formatted = instance.formatDate(selectedDates[0], "F Y");
+      //     instance.input.value = formatted;
+      //     const label = document.getElementById("paymentForLabel");
+      //     if (label) {
+      //       label.textContent = formatted;
+      //     }
+      //   }
     }
-   }
-  }
- });
+  });
 </script>
+
 {% endblock %}

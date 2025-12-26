@@ -1,0 +1,75 @@
+{% extends "base.html" %}
+{% load currency %}
+
+{% block title %}Add Tenant{% endblock %}
+
+{% block content %}
+<div class="dashboard-card mb-4" style="max-width: 700px; margin: auto;">
+ <h2 class="dashboard-title mb-3">Add Tenant</h2>
+
+ {% if error %}
+ <div class="alert alert-danger">
+  {{ error }}
+ </div>
+ {% endif %}
+
+ <form method="post">
+  {% csrf_token %}
+
+  <div class="mb-3">
+   <label class="form-label">Tenant Name</label>
+   <input type="text" name="name" class="form-control" value="{{ form_data.name|default:'' }}" required>
+  </div>
+
+  <div class="mb-3">
+   <label class="form-label">Property</label>
+   <select name="property" class="form-select" required>
+    <option value="">Select property…</option>
+    {% for prop in properties %}
+    <option value="{{ prop.id }}" {% if form_data.property == prop.id|stringformat:"s" %}selected{% endif %}>
+     {{ prop.name }}
+    </option>
+    {% endfor %}
+   </select>
+  </div>
+
+  <div class="mb-3">
+   <label class="form-label">Start Date</label>
+   <input type="date" name="start_date" class="form-control" value="{{ form_data.start_date|default:'' }}" required>
+   <small class="text-muted">
+    Rent will start from this month.
+   </small>
+  </div>
+
+  <div class="mb-3">
+   <label class="form-label">Initial Monthly Rent</label>
+   <input type="number" name="initial_rent" class="form-control" step="0.01" min="0.01"
+    value="{{ form_data.initial_rent|default:'' }}" required>
+   <small class="text-muted">
+    This rent will apply from the tenant’s start month onward.
+   </small>
+  </div>
+
+  <hr>
+
+  <div class="mb-3">
+   <label class="form-label">Phone (optional)</label>
+   <input type="text" name="phone" class="form-control" value="{{ form_data.phone|default:'' }}">
+  </div>
+
+  <div class="mb-3">
+   <label class="form-label">Email (optional)</label>
+   <input type="email" name="email" class="form-control" value="{{ form_data.email|default:'' }}">
+  </div>
+
+  <div class="d-flex gap-3 mt-4">
+   <button type="submit" class="btn btn-main">
+    Save Tenant
+   </button>
+   <a href="{% url 'tenants' %}" class="btn btn-outline-main">
+    Cancel
+   </a>
+  </div>
+ </form>
+</div>
+{% endblock %}

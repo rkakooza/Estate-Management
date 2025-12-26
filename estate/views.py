@@ -7,7 +7,10 @@ from dateutil.relativedelta import relativedelta
 from django.contrib.admin.views.decorators import staff_member_required
 from django.http import HttpResponse
 from django.contrib.auth.decorators import login_required
-from decimal import Decimal
+from decimal import Decimal, InvalidOperation
+import csv
+from estate.models import TenantRent
+from django.shortcuts import get_object_or_404
 
 from .models import (
     RentPayment,
@@ -15,7 +18,24 @@ from .models import (
     Tenant,
     Property,
     ExpenseCategory,
+    CommissionRate,
+    Employee,
+    EmployeeSalary,
 )
+
+def get_commission_rate_for_date(date_paid: date) -> Decimal:
+    """
+    Returns the commission percentage applicable on the given payment date.
+    Falls back to 0 if no rate is configured.
+    """
+    rate = (
+        CommissionRate.objects
+        .filter(effective_from__lte=date_paid.replace(day=1))
+        .order_by("-effective_from")
+        .values_list("percentage", flat=True)
+        .first()
+    )
+    return Decimal(rate) if rate is not None else Decimal("0")
 
 def _month_start(d: date) -> date:
     """Normalize any date/datetime to the first day of its month (date)."""
@@ -34,6 +54,26 @@ def _iter_month_starts(start_month: date, end_month: date):
         m = (m + relativedelta(months=1)).replace(day=1)
 
 
+
+def get_rent_for_month(tenant, month_date):
+    return (
+        TenantRent.objects
+        .filter(tenant=tenant, effective_from__lte=month_date)
+        .order_by("-effective_from")
+        .values_list("rent_amount", flat=True)
+        .first())
+
+def get_salary_for_month(employee, month_date):
+    month_start = month_date.replace(day=1)
+
+    return (
+        EmployeeSalary.objects
+        .filter(employee=employee, effective_from__lte=month_start)
+        .order_by("-effective_from")
+        .values_list("salary_amount", flat=True)
+        .first()
+    )
+
 def build_tenant_payment_status(tenants_qs, current_month_date):
 
     tenant_payment_status = []
@@ -42,7 +82,6 @@ def build_tenant_payment_status(tenants_qs, current_month_date):
     selected_month_start = _month_start(current_month_date)
 
     for tenant in tenants_qs:
-        rent = tenant.monthly_rent
         tenant_start_month = _month_start(tenant.start_date)
 
         # Include future months that already have payments (advance payments)
@@ -70,10 +109,10 @@ def build_tenant_payment_status(tenants_qs, current_month_date):
 
         # Selected month stats
         paid_selected = paid_by_month.get(selected_month_start, 0)
-        due_selected = rent
+        due_selected = get_rent_for_month(tenant, selected_month_start)
         remaining_selected = due_selected - paid_selected
 
-        partial_selected = paid_selected > 0 and paid_selected < rent
+        partial_selected = paid_selected > 0 and paid_selected < due_selected
 
         # Evaluate all scheduled months up to the selected month (inclusive)
         # and compute cumulative outstanding accurately month-by-month.
@@ -83,7 +122,8 @@ def build_tenant_payment_status(tenants_qs, current_month_date):
 
         for m in _iter_month_starts(tenant_start_month, selected_month_start):
             paid_m = paid_by_month.get(m, 0)
-            remaining_m = rent - paid_m
+            rent_m = get_rent_for_month(tenant, m)
+            remaining_m = rent_m - paid_m
 
             if remaining_m > 0:
                 missed_months += 1
@@ -97,7 +137,7 @@ def build_tenant_payment_status(tenants_qs, current_month_date):
         # - If selected month is partial, show only the selected month's remaining balance
         #   and only show the selected month name.
         if partial_selected:
-            balance = max(rent - paid_selected, 0)
+            balance = max(due_selected - paid_selected, 0)
             missed_month_names = [selected_month_start.strftime("%B %Y")]
         else:
             balance = max(cumulative_outstanding, 0)
@@ -116,7 +156,7 @@ def build_tenant_payment_status(tenants_qs, current_month_date):
             {
                 "tenant": tenant,
                 "paid": paid_selected,
-                "rent_due": rent,
+                "rent_due": due_selected,
                 "balance": balance,
                 "is_paid": balance <= 0,
                 "missed_months": missed_months,
@@ -525,6 +565,9 @@ def add_payment(request):
     else:
         current_month_date = date.today().replace(day=1)
 
+    # Fix UnboundLocalError for selected_month
+    selected_month = current_month_date
+
     #------testing----
     last_payment_month = (
     RentPayment.objects.filter(tenant=tenant)
@@ -559,7 +602,7 @@ def add_payment(request):
                 .aggregate(total=models.Sum("amount"))["total"] or Decimal("0")
             )
             paid = Decimal(paid)
-            due = Decimal(tenant.monthly_rent)
+            due = Decimal(get_rent_for_month(tenant, m))
             remaining = due - paid
 
             if remaining > 0:
@@ -592,8 +635,14 @@ def add_payment(request):
 
             latest_fully_paid = None
             for p in last_paid:
-                if Decimal(p["total"]) >= Decimal(tenant.monthly_rent):
-                    latest_fully_paid = p["payment_month"]
+                month_start = p["payment_month"].replace(day=1)
+                rent_due = Decimal(get_rent_for_month(tenant, month_start))
+                paid_total = Decimal(p["total"] or 0)
+
+                if paid_total >= rent_due:
+                    latest_fully_paid = month_start
+                else:
+                    break
 
             if latest_fully_paid:
                 default_payment_month = (
@@ -601,17 +650,22 @@ def add_payment(request):
                 ).replace(day=1)
             else:
                 default_payment_month = tenant.start_date.replace(day=1)
+                
+
+    # Month actually used for calculations (reflects Payment For)
+    effective_month = default_payment_month
 
     # Payments for the currently selected month (for display)
     if tenant:
         payments_for_month = RentPayment.objects.filter(
             tenant=tenant,
-            payment_month__year=current_month_date.year,
-            payment_month__month=current_month_date.month,
+            payment_month__year=effective_month.year,
+            payment_month__month=effective_month.month,
         ).aggregate(total=models.Sum("amount"))
         paid_for_month = Decimal(payments_for_month["total"] or 0)
-        monthly_rent = tenant.monthly_rent
-        remaining_balance = max(Decimal(monthly_rent) - paid_for_month, Decimal("0"))
+        # Fix incorrect rent lookup and Decimal consistency
+        monthly_rent = Decimal(get_rent_for_month(tenant, effective_month) or 0)
+        remaining_balance = max(monthly_rent - paid_for_month, Decimal("0"))
         max_payable_amount = remaining_balance
     else:
         paid_for_month = Decimal("0")
@@ -663,6 +717,9 @@ def add_payment(request):
         # We'll extend months forward as needed when payment remains (advances / overpayments)
         remaining_amount = amount
 
+        # Step 1: Track total collected amount
+        collected_amount = Decimal("0")
+
         # Use transaction to keep allocations atomic
         with transaction.atomic():
             # First allocate across the historical window (oldest to newest)
@@ -674,7 +731,7 @@ def add_payment(request):
                     .aggregate(total=models.Sum("amount"))["total"] or Decimal("0")
                 )
                 paid = Decimal(paid)
-                month_due = Decimal(tenant.monthly_rent)
+                month_due = Decimal(get_rent_for_month(tenant, m))
                 remaining_due = max(month_due - paid, Decimal("0"))
                 if remaining_due <= 0:
                     continue
@@ -686,6 +743,8 @@ def add_payment(request):
                     payment_month=m,
                     date_paid=date_paid,
                 )
+                # Step 2: Add to collected_amount
+                collected_amount += to_pay
                 remaining_amount -= to_pay
 
             # If still have remaining_amount, allocate to future months sequentially
@@ -699,7 +758,7 @@ def add_payment(request):
                 next_month = (last + relativedelta(months=1)).replace(day=1)
                 # Keep allocating until remaining_amount exhausted
                 while remaining_amount > 0:
-                    month_due = Decimal(tenant.monthly_rent)
+                    month_due = Decimal(get_rent_for_month(tenant, next_month))
                     # Check if already any payments exist for this future month (possible if overpay previously)
                     paid = (
                         RentPayment.objects.filter(tenant=tenant, payment_month=next_month)
@@ -718,38 +777,948 @@ def add_payment(request):
                         payment_month=next_month,
                         date_paid=date_paid,
                     )
+                    # Step 2: Add to collected_amount
+                    collected_amount += to_pay
                     remaining_amount -= to_pay
                     if remaining_amount <= 0:
                         break
                     next_month = (next_month + relativedelta(months=1)).replace(day=1)
 
-        # Redirect to payments page for the selected month and property
-        return redirect(f"/payments/?month={selected_month.strftime('%Y-%m')}&property={tenant.property.id}")
+            # Step 3: After allocations, create rent collection commission expense
+            # Automatically record rent collection commission (time-effective)
+            commission_percentage = get_commission_rate_for_date(date_paid)
+            commission_amount = (
+                collected_amount * commission_percentage / Decimal("100")
+            ).quantize(Decimal("0.01"))
+
+            if commission_amount > 0:
+                commission_category, _ = ExpenseCategory.objects.get_or_create(
+                    name="Financial & Fees"
+                )
+                Expense.objects.create(
+                    amount=commission_amount,
+                    description="Rent Collection Fee",
+                    is_recurring=True,
+                    date=date_paid,
+                    property=tenant.property,
+                    category=commission_category,
+                )
+
+        # Redirect to payments page for the default payment month and property
+        return redirect(f"/payments/?month={default_payment_month.strftime('%Y-%m')}&property={tenant.property.id}")
+
+    # Safety fallback for default_payment_month
+    if not default_payment_month:
+        default_payment_month = current_month_date
 
     context = {
         "tenant": tenant,
         "property": tenant.property if tenant else None,
-        "selected_month": default_payment_month.strftime("%Y-%m"),
-        "selected_month_label": default_payment_month.strftime("%B %Y"),
-        "monthly_rent": tenant.monthly_rent if tenant else None,
+        "selected_month": effective_month.strftime("%Y-%m"),
+        "selected_month_label": effective_month.strftime("%B %Y"),
+        "monthly_rent": monthly_rent if tenant else None,
         "remaining_balance": remaining_balance,
         "paid_for_month": paid_for_month,
         "max_payable_amount": max_payable_amount,
         "outstanding_months": outstanding_months,
+        "current_month_date": current_month_date, # remove if problem occur
     }
 
     return render(request, "add_payment.html", context)
 
 
+# ------------------- Start of Payment History (Read-only) -------------------
+@login_required
+def payments_history(request):
+    """
+    Read-only chronological payment history.
+    Default: tenant-scoped if tenant id provided.
+    """
 
+    tenant_id = request.GET.get("tenant")
+
+    # Load all tenants for the dropdown/filter
+    all_tenants = Tenant.objects.select_related("property").order_by("name")
+
+    payments_qs = RentPayment.objects.select_related(
+        "tenant",
+        "tenant__property",
+    ).order_by("-date_paid", "id")
+
+    tenant = None
+    if tenant_id:
+        try:
+            tenant = Tenant.objects.get(id=tenant_id)
+            payments_qs = payments_qs.filter(tenant=tenant)
+        except Tenant.DoesNotExist:
+            tenant = None
+
+    context = {
+        "payments": payments_qs,
+        "tenant": tenant,
+        "all_tenants": all_tenants,
+    }
+
+    return render(request, "payments_history.html", context)
+
+# ------------------- CSV Export for Payment History -------------------
+@login_required
+def payments_history_csv(request):
+    """
+    Export payment history as CSV.
+    Respects optional tenant filter.
+    """
+    tenant_id = request.GET.get("tenant")
+
+    payments_qs = RentPayment.objects.select_related(
+        "tenant",
+        "tenant__property",
+    ).order_by("-date_paid", "id")
+
+    if tenant_id:
+        try:
+            tenant = Tenant.objects.get(id=tenant_id)
+            payments_qs = payments_qs.filter(tenant=tenant)
+        except Tenant.DoesNotExist:
+            pass
+
+    response = HttpResponse(content_type="text/csv")
+    response["Content-Disposition"] = 'attachment; filename="payment_history.csv"'
+
+    writer = csv.writer(response)
+    writer.writerow([
+        "payment_id",
+        "tenant_name",
+        "property_name",
+        "payment_for_month",
+        "amount",
+        "date_paid",
+    ])
+
+    for p in payments_qs:
+        writer.writerow([
+            p.id,
+            p.tenant.name,
+            p.tenant.property.name if p.tenant.property else "",
+            p.payment_month.strftime("%Y-%m"),
+            p.amount,
+            p.date_paid,
+        ])
+
+    return response
+
+
+# ------------------- Start of Tenants View-------------------
+@login_required
 def tenants_view(request):
-    return render(request, "tenants.html")
+    tenants = (
+        Tenant.objects
+        .select_related("property")
+        .order_by("property__name", "name")
+    )
+
+    context = {
+        "tenants": tenants,
+    }
+
+    return render(request, "tenants.html", context)
 
 
+# ------------------- Add Tenant View  -------------------
+@login_required
+def add_tenant(request):
+    """
+    Add a new tenant and initialize rent history.
+    NOTE:
+    - Tenant creation must always be paired with an initial TenantRent.
+    """
+    if request.method == "POST":
+        name = request.POST.get("name", "").strip()
+        property_id = request.POST.get("property")
+        start_date_raw = request.POST.get("start_date")
+        phone = request.POST.get("phone")
+        email = request.POST.get("email")
+        rent_raw = request.POST.get("initial_rent")
+
+        # --- Basic validation ---
+        if not name or not property_id or not start_date_raw or not rent_raw:
+            return render(request, "add_tenant.html", {
+                "properties": Property.objects.all().order_by("name"),
+                "error": "Name, property, start date, and rent are required.",
+                "form_data": request.POST,
+            })
+
+        try:
+            start_date = datetime.strptime(start_date_raw, "%Y-%m-%d").date()
+        except ValueError:
+            return render(request, "add_tenant.html", {
+                "properties": Property.objects.all().order_by("name"),
+                "error": "Invalid start date.",
+                "form_data": request.POST,
+            })
+
+        try:
+            initial_rent = Decimal(rent_raw)
+            if initial_rent <= 0:
+                raise InvalidOperation
+        except (InvalidOperation, ValueError):
+            return render(request, "add_tenant.html", {
+                "properties": Property.objects.all().order_by("name"),
+                "error": "Initial rent must be a positive number.",
+                "form_data": request.POST,
+            })
+
+        # Normalize effective rent month = tenant start month (accounting rule)
+        effective_month = start_date.replace(day=1)
+
+        with transaction.atomic():
+            tenant = Tenant.objects.create(
+                name=name,
+                property_id=int(property_id),
+                start_date=start_date,
+                phone=phone,
+                email=email,
+                active=True,
+                monthly_rent=initial_rent, 
+            )
+
+            TenantRent.objects.create(
+                tenant=tenant,
+                rent_amount=initial_rent,
+                effective_from=effective_month,
+            )
+
+        return redirect("tenant_details", tenant_id=tenant.id)
+
+    # GET: render empty Add Tenant form
+    properties = Property.objects.all().order_by("name")
+
+    context = {
+        "properties": properties,
+    }
+
+    return render(request, "add_tenant.html", context)
+
+# ------------------- Edit Tenant View (with Rent Change Validation) -------------------
+@login_required
+def edit_tenant(request, tenant_id):
+    """
+    Edit tenant core details and optionally schedule a rent change.
+    IMPORTANT RULES:
+    - Rent changes NEVER affect past months.
+    - New rent becomes effective from a selected future month (inclusive).
+    - Only one rent schedule per tenant per month (no duplicates).
+    - Rent changes are non-retroactive: effective_from >= current month.
+    - All changes are atomic (all-or-nothing).
+    """
+    tenant = get_object_or_404(Tenant, id=tenant_id)
+    properties = Property.objects.all().order_by("name")
+    
+    if request.method == "GET":
+        today_month = date.today().replace(day=1)
+        current_rent_entry = (
+            TenantRent.objects
+            .filter(tenant=tenant, effective_from__lte=today_month)
+            .order_by("-effective_from")
+            .first()
+        )
+        current_rent = (
+            current_rent_entry.rent_amount
+            if current_rent_entry
+            else tenant.monthly_rent
+        )
+        current_rent_effective = (
+            current_rent_entry.effective_from
+            if current_rent_entry
+            else tenant.start_date
+        )
+        return render(request, "edit_tenant.html", {
+            "tenant": tenant,
+            "properties": properties,
+            "current_rent": current_rent,
+            "current_rent_effective": current_rent_effective,
+        })
+
+    if request.method == "POST":
+        with transaction.atomic():
+            # --- Basic tenant fields ---
+            tenant.name = request.POST.get("name", tenant.name)
+            tenant.phone = request.POST.get("phone", tenant.phone)
+            tenant.email = request.POST.get("email", tenant.email)
+
+            property_id = request.POST.get("property")
+            if property_id:
+                tenant.property_id = int(property_id)
+
+            # --- Optional rent change ---
+            rent_amount_raw = request.POST.get("new_rent")
+            effective_month_raw = request.POST.get("rent_effective_month")
+
+            if rent_amount_raw and effective_month_raw:
+                try:
+                    new_rent = Decimal(rent_amount_raw)
+                    # Normalize effective_month to first of month (accounting rule)
+                    effective_month = datetime.strptime(
+                        effective_month_raw, "%Y-%m"
+                    ).date().replace(day=1)
+                except (InvalidOperation, ValueError):
+                    new_rent = None
+                    effective_month = None
+
+                if new_rent is not None and effective_month is not None:
+                    today_month = date.today().replace(day=1)
+                    # Backend validation: new_rent must be > 0
+                    if new_rent <= 0:
+                        return render(
+                            request,
+                            "edit_tenant.html",
+                            {
+                                "tenant": tenant,
+                                "properties": properties,
+                                "error": "Rent amount must be greater than zero.",
+                                "form_data": request.POST,
+                            },
+                        )
+                    # Backend validation: effective_month must be current or future month
+                    if effective_month < today_month:
+                        return render(
+                            request,
+                            "edit_tenant.html",
+                            {
+                                "tenant": tenant,
+                                "properties": properties,
+                                "error": "Rent changes must start from the current or a future month.",
+                                "form_data": request.POST,
+                            },
+                        )
+
+                    # Only one rent schedule per tenant per month (no duplicates)
+                    rent_obj = TenantRent.objects.filter(
+                        tenant=tenant,
+                        effective_from=effective_month
+                    ).first()
+                    if rent_obj:
+                        # If a record for this tenant+month exists, update it (accounting rule)
+                        rent_obj.rent_amount = new_rent
+                        rent_obj.save()
+                    else:
+                        # Otherwise, create a new rent record (history-preserving)
+                        TenantRent.objects.create(
+                            tenant=tenant,
+                            rent_amount=new_rent,
+                            effective_from=effective_month,
+                        )
+
+            tenant.save()
+        return redirect("tenant_details", tenant_id=tenant.id)
+
+    return redirect("tenant_details", tenant_id=tenant.id)
+
+# ------------------- Tenant Detail View -------------------
+@login_required
+def tenant_details(request, tenant_id):
+    """
+    Tenant detail / edit page.
+    - Read-only payment history
+    - Rent history (future-effective only)
+    - Deactivate tenant support
+    """
+    try:
+        tenant = (
+            Tenant.objects
+            .select_related("property")
+            .get(id=tenant_id)
+        )
+    except Tenant.DoesNotExist:
+        return render(request, "404.html", status=404)
+
+    # Determine current effective rent (non-retroactive)
+    today_month = date.today().replace(day=1)
+    current_rent_entry = (
+        TenantRent.objects
+        .filter(tenant=tenant, effective_from__lte=today_month)
+        .order_by("-effective_from")
+        .first()
+    )
+    current_rent = (
+        current_rent_entry.rent_amount
+        if current_rent_entry
+        else tenant.monthly_rent
+    )
+    current_rent_effective = (
+        current_rent_entry.effective_from
+        if current_rent_entry
+        else tenant.start_date
+    )
+
+    # Compute outstanding balance and payment status for current month
+    from decimal import Decimal
+    current_month_date = date.today().replace(day=1)
+    tenant_status_list, _ = build_tenant_payment_status(
+        Tenant.objects.filter(id=tenant.id),
+        current_month_date
+    )
+    if tenant_status_list:
+        outstanding_balance = tenant_status_list[0].get("balance", Decimal("0"))
+        status_type = tenant_status_list[0].get("status_type", "On Time")
+    else:
+        outstanding_balance = Decimal("0")
+        status_type = "On Time"
+
+    # Rent history (chronological)
+    rent_history = (
+        TenantRent.objects
+        .filter(tenant=tenant)
+        .order_by("effective_from")
+    )
+
+    # Payment history (most recent first, read-only)
+    payments = (
+        RentPayment.objects
+        .filter(tenant=tenant)
+        .order_by("-date_paid", "-id")
+    )
+    
+
+    context = {
+        "tenant": tenant,
+        "rent_history": rent_history,
+        "payments": payments,
+        "outstanding_balance": outstanding_balance,
+        "payment_status": status_type,
+        "current_rent": current_rent,
+        "current_rent_effective": current_rent_effective,
+    }
+
+    return render(request, "tenant_details.html", context)
+
+# ------------------- Toggle Tenant Active Status -------------------
+from django.shortcuts import get_object_or_404
+@login_required
+def toggle_tenant_active(request, tenant_id):
+    """
+    Toggle the active status of a tenant.
+    If POST: deactivate or activate and set end_date accordingly.
+    Otherwise: redirect to tenant details.
+    """
+    # Only allow POST
+    if request.method != "POST":
+        return redirect("tenant_details", tenant_id=tenant_id)
+
+    try:
+        tenant = Tenant.objects.get(id=tenant_id)
+    except Tenant.DoesNotExist:
+        return redirect("tenants_view")
+
+    if tenant.active:
+        tenant.active = False
+        tenant.end_date = date.today()
+    else:
+        tenant.active = True
+        tenant.end_date = None
+    tenant.save()
+    return redirect("tenant_details", tenant_id=tenant_id)
+
+
+# ------------------- Add Employee View -------------------
+@login_required
+def add_employee(request):
+    """
+    Add a new employee and initialize salary history.
+    RULES:
+    - Employee must be assigned to a property
+    - Initial salary is stored in EmployeeSalary (non‑retroactive)
+    - Salary effective month = start_date month
+    """
+    properties = Property.objects.all().order_by("name")
+
+    if request.method == "POST":
+        name = request.POST.get("name", "").strip()
+        role = request.POST.get("role", "").strip()
+        phone = request.POST.get("phone", "").strip()
+        property_id = request.POST.get("property")
+        salary_raw = request.POST.get("monthly_salary")
+        start_date_raw = request.POST.get("start_date")
+
+        # --- Validation ---
+        if not name or not property_id or not salary_raw or not start_date_raw:
+            return render(request, "add_employee.html", {
+                "properties": properties,
+                "error": "Name, property, salary, and start date are required.",
+                "form_data": request.POST,
+            })
+
+        try:
+            salary_amount = Decimal(salary_raw)
+            if salary_amount <= 0:
+                raise InvalidOperation
+        except (InvalidOperation, TypeError):
+            return render(request, "add_employee.html", {
+                "properties": properties,
+                "error": "Salary must be a positive number.",
+                "form_data": request.POST,
+            })
+
+        try:
+            start_date = datetime.strptime(start_date_raw, "%Y-%m-%d").date()
+        except ValueError:
+            return render(request, "add_employee.html", {
+                "properties": properties,
+                "error": "Invalid start date.",
+                "form_data": request.POST,
+            })
+
+        # Normalize salary effective month (accounting rule)
+        effective_month = start_date.replace(day=1)
+
+        with transaction.atomic():
+            employee = Employee.objects.create(
+                name=name,
+                role=role,
+                phone=phone,
+                property_id=int(property_id),
+                monthly_salary=salary_amount, 
+                start_date=start_date,
+                active=True,
+            )
+
+            EmployeeSalary.objects.create(
+                employee=employee,
+                salary_amount=salary_amount,
+                effective_from=effective_month,
+            )
+
+        return redirect("employees_list")
+
+    # GET
+    return render(request, "add_employee.html", {
+        "properties": properties,
+    })
+
+# ------------------- Pay Salary View -------------------
+@login_required
+def pay_salary(request, employee_id):
+    """
+    Pay salary for a specific employee for a selected month.
+    This creates an Expense record (accounting-safe).
+    """
+    employee = get_object_or_404(Employee, id=employee_id, active=True)
+
+    if request.method == "POST":
+        month_raw = request.POST.get("month")
+        date_paid_raw = request.POST.get("date_paid")
+
+        # Parse salary month (YYYY-MM)
+        try:
+            parsed = datetime.strptime(month_raw, "%Y-%m")
+            salary_month = parsed.date().replace(day=1)
+        except (TypeError, ValueError):
+            salary_month = date.today().replace(day=1)
+
+        # Immediately after parsing salary_month
+        effective_month = salary_month
+        selected_month_label = effective_month.strftime("%B %Y")
+
+        # Fetch salary AFTER parsing month
+        salary_amount = get_salary_for_month(employee, salary_month)
+
+        if salary_amount is None:
+            return render(
+                request,
+                "pay_salary.html",
+                {
+                    "employee": employee,
+                    "default_month": salary_month.strftime("%Y-%m"),
+                    "error": "No salary configured for this employee for the selected month.",
+                },
+            )
+
+        # ---- BLOCK DOUBLE SALARY PAYMENTS ----
+        # salary_label = f"Salary — {employee.name} ({salary_month.strftime('%B %Y')})"
+
+        # already_paid = Expense.objects.filter(
+        #     description=salary_label,
+        # ).exists()
+        salary_category = ExpenseCategory.objects.filter(name__iexact="salary").first()
+
+        marker = f"[Emp #{employee.id}]"
+        salary_label = f"Salary — {employee.name} {marker} ({salary_month.strftime('%B %Y')})"
+
+        already_paid = Expense.objects.filter(
+            category=salary_category,
+            date=salary_month,               # salary month (ledger month)
+            description__contains=marker,     # stable even if name changes
+        ).exists()
+
+        if already_paid:
+            return render(
+                request,
+                "pay_salary.html",
+                {
+                    "employee": employee,
+                    "default_month": effective_month.strftime("%Y-%m"),
+                    "salary_amount": salary_amount,
+                    "selected_month_label": selected_month_label,
+                    "error": "Salary has already been paid for this employee for the selected month.",
+                },
+            )
+
+        # Parse payment date
+        try:
+            date_paid = datetime.strptime(date_paid_raw, "%Y-%m-%d").date()
+        except (TypeError, ValueError):
+            date_paid = date.today()
+
+        # Create salary expense
+        Expense.objects.create(
+            # employee=employee,
+            amount=salary_amount,
+            description=salary_label,
+            is_recurring=False,
+            # date=date_paid,
+            date=salary_month,
+            property=employee.property,
+            category=salary_category,
+        )
+
+        return redirect("expenses_ledger")
+
+    # GET: Determine default salary month (same UX rule as tenants)
+    month_raw = request.GET.get("month")
+
+    # --- Determine default salary month (same UX rule as tenants) ---
+    last_paid_expense = (
+        Expense.objects
+        .filter(
+            category__name__iexact="salary",
+            description__startswith=f"Salary — {employee.name} ("
+        )
+        .order_by("-date")
+        .first()
+    )
+
+    if month_raw:
+        try:
+            salary_month = datetime.strptime(month_raw, "%Y-%m").date().replace(day=1)
+        except ValueError:
+            salary_month = date.today().replace(day=1)
+    elif last_paid_expense:
+        # If already paid, default to NEXT month
+        salary_month = (last_paid_expense.date.replace(day=1) + relativedelta(months=1))
+    else:
+        # Never paid → start from current month
+        salary_month = date.today().replace(day=1)
+
+    # After determining salary_month
+    effective_month = salary_month
+    selected_month_label = effective_month.strftime("%B %Y")
+
+    salary_amount = get_salary_for_month(employee, salary_month)
+
+    # ---------------------------------------
+    # Determine last paid salary month (UX)
+    # ---------------------------------------
+    last_paid_expense = (
+        Expense.objects
+        .filter(
+            category__name__iexact="salary",
+            description__startswith=f"Salary — {employee.name} ("
+        )
+        .order_by("-date")
+        .first()
+    )
+
+    last_paid_month = None
+    if last_paid_expense:
+        try:
+            # Extract YYYY-MM from description
+            last_paid_month = last_paid_expense.description.split("—")[-1].strip()
+        except Exception:
+            last_paid_month = None
+
+    context = {
+        "employee": employee,
+        "default_month": salary_month.strftime("%Y-%m"),
+        "salary_amount": salary_amount,
+        "last_paid_month": last_paid_month,
+        "selected_month_label": selected_month_label,
+    }
+    return render(request, "pay_salary.html", context)
+
+# ------------------- Change Salary / Raise (non-retroactive) -------------------
+@login_required
+def change_salary(request, employee_id):
+    """
+    Schedule a salary change (raise or adjustment) for an employee.
+    RULES:
+    - Non-retroactive: effective month must be current or future.
+    - One salary record per employee per effective month.
+    """
+    employee = get_object_or_404(Employee, id=employee_id)
+
+    if request.method != "POST":
+        return redirect("pay_salary", employee_id=employee.id)
+
+    new_salary_raw = request.POST.get("new_salary")
+    effective_month_raw = request.POST.get("effective_month")
+
+    if not new_salary_raw or not effective_month_raw:
+        return redirect("pay_salary", employee_id=employee.id)
+
+    try:
+        new_salary = Decimal(new_salary_raw)
+        if new_salary <= 0:
+            raise InvalidOperation
+    except (InvalidOperation, TypeError):
+        return redirect("pay_salary", employee_id=employee.id)
+
+    try:
+        effective_month = (
+            datetime.strptime(effective_month_raw, "%Y-%m")
+            .date()
+            .replace(day=1)
+        )
+    except (TypeError, ValueError):
+        return redirect("pay_salary", employee_id=employee.id)
+
+    today_month = date.today().replace(day=1)
+    if effective_month < today_month:
+        # Block retroactive changes
+        return redirect("pay_salary", employee_id=employee.id)
+
+    with transaction.atomic():
+        salary_obj = (
+            EmployeeSalary.objects
+            .filter(employee=employee, effective_from=effective_month)
+            .first()
+        )
+
+        if salary_obj:
+            salary_obj.salary_amount = new_salary
+            salary_obj.save()
+        else:
+            EmployeeSalary.objects.create(
+                employee=employee,
+                salary_amount=new_salary,
+                effective_from=effective_month,
+            )
+
+        # Keep legacy field in sync for display only
+        employee.monthly_salary = new_salary
+        employee.save(update_fields=["monthly_salary"])
+
+    return redirect(
+        f"/employees/{employee.id}/pay/?month={effective_month.strftime('%Y-%m')}"
+    )
+
+# ------------------- Expense Ledger (Read-only) -------------------
+@login_required
+def expenses_ledger(request):
+    """
+    Monthly expense ledger (read-only).
+    Shows all expenses for a selected month, optionally filtered by property.
+    """
+    today = date.today().replace(day=1)
+    
+
+    # --- Read filters ---
+    selected_month = request.GET.get("month")
+    selected_property = request.GET.get("property")
+
+    try:
+        selected_property = int(selected_property)
+    except (TypeError, ValueError):
+        selected_property = None
+
+    # --- Parse month ---
+    if selected_month:
+        try:
+            parsed = datetime.strptime(selected_month, "%Y-%m")
+            current_month_date = parsed.date().replace(day=1)
+            year = parsed.year
+            month = parsed.month
+        except ValueError:
+            current_month_date = today.replace(day=1)
+            year = current_month_date.year
+            month = current_month_date.month
+            selected_month = None
+    else:
+        current_month_date = today.replace(day=1)
+        year = current_month_date.year
+        month = current_month_date.month
+
+    # --- Base queryset ---
+    expenses_qs = Expense.objects.filter(
+        date__year=year,
+        date__month=month,
+    ).select_related("property", "category").order_by("-date", "-id")
+
+    if selected_property:
+        expenses_qs = expenses_qs.filter(property_id=selected_property)
+
+    # --- Totals ---
+    total_expenses = (
+        expenses_qs.aggregate(total=models.Sum("amount"))["total"] or Decimal("0")
+    )
+
+    recurring_total = (
+        expenses_qs.filter(is_recurring=True)
+        .aggregate(total=models.Sum("amount"))["total"] or Decimal("0")
+    )
+
+    one_time_total = (
+        expenses_qs.filter(is_recurring=False)
+        .aggregate(total=models.Sum("amount"))["total"] or Decimal("0")
+    )
+
+    # --- Month ---
+    month_choices = []
+    for i in range(12):
+        m = today - relativedelta(months=i)
+        month_choices.append({
+            "label": m.strftime("%B %Y"),
+            "value": m.strftime("%Y-%m")
+        })
+
+    context = {
+        "expenses": expenses_qs,
+        "total_expenses": total_expenses,
+        "recurring_total": recurring_total,
+        "one_time_total": one_time_total,
+        "all_properties": Property.objects.all(),
+        "selected_property": str(selected_property),
+        "selected_month": selected_month,
+        "selected_month_label": current_month_date.strftime("%B %Y"),
+        "month_choices": month_choices,
+    }
+
+    return render(request, "expenses_ledger.html", context)
+
+# ------------------- Start of Settings View-------------------
 def settings_view(request):
     return render(request, "settings.html")
+# ------------------- End of Settings View-------------------
 
 
+# ------------------- Add Expense View -------------------
+@login_required
+def add_expense(request):
+    """
+    Add a new expense (recurring or one-time).
+    Expenses always subtract from Available Funds.
+    """
+    properties = Property.objects.all().order_by("name")
+    categories = ExpenseCategory.objects.all().order_by("name")
+
+    if request.method == "POST":
+        amount_raw = request.POST.get("amount")
+        description = request.POST.get("description", "").strip()
+        expense_type = request.POST.get("expense_type")  # 'recurring' or 'one_time'
+        category_id = request.POST.get("category")
+        property_id = request.POST.get("property")
+        date_raw = request.POST.get("date")
+
+        # --- Validation ---
+        try:
+            amount = Decimal(amount_raw)
+            if amount <= 0:
+                raise InvalidOperation
+        except (InvalidOperation, TypeError):
+            return render(request, "add_expense.html", {
+                "properties": properties,
+                "categories": categories,
+                "error": "Amount must be a positive number.",
+                "form_data": request.POST,
+            })
+
+        if not description:
+            return render(request, "add_expense.html", {
+                "properties": properties,
+                "categories": categories,
+                "error": "Description is required.",
+                "form_data": request.POST,
+            })
+
+        if not property_id:
+            return render(request, "add_expense.html", {
+                "properties": properties,
+                "categories": categories,
+                "error": "Property is required.",
+                "form_data": request.POST,
+            })
+
+        if expense_type not in ("recurring", "one_time"):
+            return render(request, "add_expense.html", {
+                "properties": properties,
+                "categories": categories,
+                "error": "Please select an expense type.",
+                "form_data": request.POST,
+            })
+
+        try:
+            expense_date = (
+                datetime.strptime(date_raw, "%Y-%m-%d").date()
+                if date_raw else date.today()
+            )
+        except ValueError:
+            expense_date = date.today()
+
+        is_recurring = expense_type == "recurring"
+
+        # --- Create expense ---
+        Expense.objects.create(
+            amount=amount,
+            description=description,
+            is_recurring=is_recurring,
+            date=expense_date,
+            property_id=int(property_id),
+            category_id=int(category_id) if category_id else None,
+        )
+
+        return redirect("dashboard")
+
+    # GET request
+    context = {
+        "properties": properties,
+        "categories": categories,
+    }
+    return render(request, "add_expense.html", context)
+
+# ------------------- Employee List (Read-only) -------------------
+@login_required
+def employees_list(request):
+    """
+    Read-only list of employees.
+    Salaries are paid via Expense records.
+    """
+    employees = (
+        Employee.objects
+        .order_by("name")
+    )
+
+    context = {
+        "employees": employees,
+    }
+
+    return render(request, "employees_list.html", context)
+
+# ------------------- Toggle Employee Active Status -------------------
+@login_required
+def toggle_employee_active(request, employee_id):
+    if request.method != "POST":
+        return redirect("employees_list")
+
+    employee = get_object_or_404(Employee, id=employee_id)
+
+    if employee.active:
+        employee.active = False
+        employee.end_date = date.today()
+    else:
+        employee.active = True
+        employee.end_date = None
+
+    employee.save()
+    return redirect("employees_list")
 
 
 

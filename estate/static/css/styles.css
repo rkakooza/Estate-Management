@@ -1,3 +1,8 @@
+/* DEBUG: if you don't see a pink background, CSS is NOT loading */
+/* body {
+   background: hotpink !important;
+} */
+
 /* ============================================================
    GLOBAL THEME + RESET
 ============================================================ */
@@ -9,8 +14,8 @@ body {
 }
 
 main.content {
-   margin-left: 80px;
-   /* sidebar width */
+   margin-left: 120px;
+   margin-top: 88px;
    padding: 32px;
 }
 
@@ -39,21 +44,37 @@ h6 {
 /* ============================================================
    SIDEBAR
 ============================================================ */
+/* Sidebar positioning fix */
 .sidebar {
-   width: 80px;
    position: fixed;
-   top: 0;
-   bottom: 0;
-   left: 0;
-   background: #ffffff;
-   padding: 32px 0;
+   top: 88px;
+   left: 16px;
+
+   height: calc(100vh - 104px);
+   width: 84px;
+
+   background: linear-gradient(180deg, #ffffff, #f6faf6);
+   border-radius: 34px;
+   padding-top: 18px;
+   padding-bottom: 18px;
+
+   box-shadow:
+      0 16px 40px rgba(0, 0, 0, 0.12),
+      inset 0 1px 0 rgba(255, 255, 255, 0.9);
+
    display: flex;
    flex-direction: column;
    align-items: center;
-   gap: 32px;
-   box-shadow: 4px 0 20px rgba(0, 0, 0, 0.05);
-   border-right: 1px solid #dde6dd;
-   z-index: 1100;
+
+   z-index: 1050;
+}
+
+.sidebar .nav {
+   width: 100%;
+   display: flex;
+   flex-direction: column;
+   align-items: center;
+   gap: 4px;
 }
 
 .sidebar-title {
@@ -64,29 +85,77 @@ h6 {
 }
 
 .nav-link {
-   width: 100%;
-   text-align: center;
-   padding: 14px 0;
+   width: 64px;
+   height: 64px;
+
+   display: flex;
+   flex-direction: column;
+   align-items: center;
+   justify-content: center;
+   gap: 4px;
+
+   border-radius: 22px;
+
    color: #5f6e5f !important;
-   font-size: 13px;
+   font-size: 11px;
+   font-weight: 500;
+
+   text-align: center;
+   padding: 0;
 }
 
 .nav-link:hover {
-   background: #e9efe8;
+   background: #eef4ee;
    color: #2c4d2c !important;
 }
 
 .nav-link.active {
-   background: #d7ead7 !important;
+   background: linear-gradient(135deg, #dff0df, #cfe8cf);
    color: #1f3d1f !important;
    font-weight: 700;
-   border-right: 4px solid #2d5b3a;
+   border-radius: 22px;
+
+   box-shadow:
+      0 6px 14px rgba(45, 91, 58, 0.25),
+      inset 0 1px 0 rgba(255, 255, 255, 0.6);
+}
+
+.sidebar i.bi {
+   font-size: 20px;
+   margin-bottom: 2px;
 }
 
 .sidebar-divider {
    border-color: #d8e3d8;
    width: 70%;
    margin: auto;
+}
+
+/* ============================================================
+   SIDEBAR LOGO
+============================================================ */
+.sidebar-logo {
+   display: flex;
+   justify-content: center;
+   align-items: center;
+   padding: 16px 0 12px;
+   margin-bottom: 8px;
+}
+
+.sidebar-logo i {
+   font-size: 34px;
+   color: #2d5b3a;
+   text-shadow: 0 0 12px rgba(45, 91, 58, 0.25);
+}
+
+/* ============================================================
+   NAVBAR ALIGNMENT
+============================================================ */
+.navbar {
+   height: 72px;
+   box-shadow: 0 8px 24px rgba(0, 0, 0, 0.08);
+   border-bottom-left-radius: 18px;
+   border-bottom-right-radius: 18px;
 }
 
 /* ============================================================

@@ -1,0 +1,72 @@
+{% extends "base.html" %}
+
+{% block title %}Add Employee{% endblock %}
+
+{% block content %}
+<div class="dashboard-card" style="max-width: 600px; margin: auto;">
+
+  <h2 class="dashboard-title mb-4">Add Employee</h2>
+
+  {% if error %}
+  <div class="alert alert-danger">
+    {{ error }}
+  </div>
+  {% endif %}
+
+  <form method="post">
+    {% csrf_token %}
+
+    <div class="mb-3">
+      <label class="form-label">Full Name</label>
+      <input type="text" name="name" class="form-control" value="{{ form_data.name|default:'' }}" required>
+    </div>
+
+    <div class="mb-3">
+      <label class="form-label">Role (optional)</label>
+      <input type="text" name="role" class="form-control" value="{{ form_data.role|default:'' }}">
+    </div>
+
+    <div class="mb-3">
+      <label class="form-label">Property</label>
+      <select name="property" class="form-control" required>
+        <option value="">Select property</option>
+        {% for prop in properties %}
+        <option value="{{ prop.id }}" {% if form_data.property == prop.id|stringformat:"s" %}selected{% endif %}>
+          {{ prop.name }}
+        </option>
+        {% endfor %}
+      </select>
+    </div>
+
+    <div class="mb-3">
+      <label class="form-label">Phone (optional)</label>
+      <input type="text" name="phone" class="form-control" value="{{ form_data.phone|default:'' }}">
+    </div>
+
+    <div class="mb-3">
+      <label class="form-label">Initial Monthly Salary</label>
+      <input type="number" name="monthly_salary" class="form-control" step="0.01" min="0"
+        value="{{ form_data.monthly_salary|default:'' }}" required>
+    </div>
+
+    <div class="mb-4">
+      <label class="form-label">Start Date</label>
+      <input type="date" name="start_date" class="form-control" value="{{ form_data.start_date|default:'' }}" required>
+      <small class="text-muted">
+        This salary becomes effective from the start month and applies going forward.
+      </small>
+    </div>
+
+    <div class="d-flex gap-3">
+      <button type="submit" class="btn btn-main">
+        Save Employee
+      </button>
+
+      <a href="{% url 'dashboard' %}" class="btn btn-outline-main">
+        Cancel
+      </a>
+    </div>
+
+  </form>
+</div>
+{% endblock %}

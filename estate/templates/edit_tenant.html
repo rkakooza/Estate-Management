@@ -1,0 +1,186 @@
+{% extends "base.html" %}
+{% load currency %}
+
+{% block content %}
+<div class="dashboard-card mb-4" style="max-width: 800px; margin: auto;">
+  <div class="d-flex justify-content-between align-items-center mb-3">
+    <h2 class="dashboard-title mb-0">Edit Tenant</h2>
+    <a href="{% url 'tenant_details' tenant.id %}" class="btn btn-outline-main btn-sm">
+      ← Back
+    </a>
+  </div>
+
+  {% if error %}
+    <div class="alert alert-danger rounded-4">
+      {{ error }}
+    </div>
+  {% endif %}
+
+  <div class="p-3 rounded-4 mb-4" style="background:#f6faf6;">
+    <div class="d-flex justify-content-between align-items-center">
+      <div>
+        <div class="fw-bold">{{ tenant.name }}</div>
+        <div class="text-muted small">{{ tenant.property.name }}</div>
+      </div>
+      {% if tenant.active %}
+        <span class="badge bg-success">Active</span>
+      {% else %}
+        <span class="badge bg-secondary">Inactive</span>
+      {% endif %}
+    </div>
+
+    <hr class="my-3"/>
+
+    <div class="d-flex flex-wrap gap-4">
+      <div>
+        <div class="text-muted small">Current Rent</div>
+        <div class="fw-bold">{{ current_rent|ugx }}</div>
+      </div>
+
+      {% if current_rent_effective %}
+      <div>
+        <div class="text-muted small">Effective From</div>
+        <div class="fw-bold">{{ current_rent_effective|date:"F Y" }}</div>
+      </div>
+      {% endif %}
+    </div>
+
+    <small class="text-muted d-block mt-2">
+      Rent changes do not retroactively affect past months.
+    </small>
+  </div>
+
+  <form method="post">
+    {% csrf_token %}
+
+    <h5 class="mb-3">Tenant Details</h5>
+
+    <div class="mb-3">
+      <label class="form-label">Tenant Name</label>
+      <input
+        type="text"
+        name="name"
+        class="form-control"
+        value="{% if form_data %}{{ form_data.name }}{% else %}{{ tenant.name }}{% endif %}"
+        required
+      >
+    </div>
+
+    <div class="row">
+      <div class="col-md-6 mb-3">
+        <label class="form-label">Phone</label>
+        <input
+          type="text"
+          name="phone"
+          class="form-control"
+          value="{% if form_data %}{{ form_data.phone }}{% else %}{{ tenant.phone }}{% endif %}"
+        >
+      </div>
+      <div class="col-md-6 mb-3">
+        <label class="form-label">Email</label>
+        <input
+          type="email"
+          name="email"
+          class="form-control"
+          value="{% if form_data %}{{ form_data.email }}{% else %}{{ tenant.email }}{% endif %}"
+        >
+      </div>
+    </div>
+
+    <div class="mb-4">
+      <label class="form-label">Property</label>
+      <select name="property" class="form-select">
+        {% for prop in properties %}
+          <option value="{{ prop.id }}"
+            {% if form_data %}
+              {% if form_data.property == prop.id|stringformat:"s" %}selected{% endif %}
+            {% else %}
+              {% if tenant.property.id == prop.id %}selected{% endif %}
+            {% endif %}
+          >
+            {{ prop.name }}
+          </option>
+        {% endfor %}
+      </select>
+    </div>
+
+    <h5 class="mb-3">Schedule Rent Change</h5>
+    <div class="alert alert-warning rounded-4">
+      <div class="fw-bold mb-1">Important</div>
+      <div class="small">
+        New rent takes effect from the selected month forward and does not modify previous months.
+      </div>
+    </div>
+
+    <div class="row">
+      <div class="col-md-6 mb-3">
+        <label class="form-label">New Rent Amount (UGX)</label>
+        <input
+          type="number"
+          name="new_rent"
+          class="form-control"
+          step="0.01"
+          min="0"
+          value="{% if form_data %}{{ form_data.new_rent }}{% endif %}"
+        >
+      </div>
+
+      <div class="col-md-6 mb-3">
+        <label class="form-label">Effective Month</label>
+
+        <input
+          type="text"
+          id="rentMonthDisplay"
+          class="form-control"
+          placeholder="Select month..."
+          readonly
+        >
+
+        <input
+          type="hidden"
+          name="rent_effective_month"
+          id="rentMonthValue"
+          value="{% if form_data %}{{ form_data.rent_effective_month }}{% endif %}"
+        >
+      </div>
+    </div>
+
+    <small class="text-muted">
+      Both a new rent amount and an effective month are required to schedule a rent change.
+    </small>
+
+    <div class="d-flex gap-3 mt-4">
+      <button type="submit" class="btn btn-main">
+        Save Changes
+      </button>
+      <a href="{% url 'tenant_details' tenant.id %}" class="btn btn-outline-main">
+        Cancel
+      </a>
+    </div>
+  </form>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+  flatpickr("#rentMonthDisplay", {
+    plugins: [
+      new monthSelectPlugin({
+        shorthand: false,
+        dateFormat: "Y-m",
+        altFormat: "F Y"
+      })
+    ],
+    defaultDate: "{% if form_data and form_data.rent_effective_month %}{{ form_data.rent_effective_month }}{% endif %}",
+    onChange: function(selectedDates, dateStr, instance) {
+      document.getElementById("rentMonthValue").value = dateStr;
+      instance.input.value = instance.formatDate(selectedDates[0], "F Y");
+    },
+    onReady: function(selectedDates, dateStr, instance) {
+      if (selectedDates.length) {
+        instance.input.value = instance.formatDate(selectedDates[0], "F Y");
+      }
+    }
+  });
+</script>
+{% endblock %}

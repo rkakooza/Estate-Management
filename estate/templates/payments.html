@@ -5,143 +5,139 @@
 {% block content %}
 
 <div class="dashboard-card mb-4">
- <h2 class="dashboard-title mb-3">
-  <i class="bi bi-cash-stack me-2"></i> Payments
- </h2>
+  <div class="d-flex justify-content-between align-items-center mb-3">
+    <h2 class="dashboard-title mb-0">
+      <i class="bi bi-cash-stack me-2"></i> Payments
+    </h2>
 
- <form method="get" class="row mb-4">
-
-  <!-- Property filter -->
-  <div class="col-md-4">
-   <label class="form-label">Select Property</label>
-   <select name="property" class="form-select">
-    <option value="">All Properties</option>
-    {% for prop in all_properties %}
-    <option value="{{ prop.id }}"
-    {% if selected_property == prop.id|stringformat:"s" %} selected {% endif %}>
-    {{ prop.name }}
-</option>
-
-    {% endfor %}
-   </select>
+    <a href="{% url 'payments_history' %}" class="btn btn-outline-main btn-sm">
+      <i class="bi bi-clock-history me-1"></i> View Payment History
+    </a>
   </div>
 
-  <!-- Month filter -->
-  <div class="col-md-4">
- <label class="form-label">Select Month</label>
+  <form method="get" class="row mb-4">
 
- <input
-   type="text"
-   id="monthPickerDisplay"
-   class="form-control"
-   placeholder="Select month"
- >
+    <!-- Property filter -->
+    <div class="col-md-4">
+      <label class="form-label">Select Property</label>
+      <select name="property" class="form-select">
+        <option value="">All Properties</option>
+        {% for prop in all_properties %}
+        <option value="{{ prop.id }}" {% if selected_property == prop.id|stringformat:"s" %} selected {% endif %}>
+          {{ prop.name }}
+        </option>
 
- <input
-   type="hidden"
-   id="monthPicker"
-   name="month"
-   value="{% if selected_month %}{{ selected_month }}{% else %}{{ current_month_date|date:'Y-m' }}{% endif %}"
- >
-</div>
+        {% endfor %}
+      </select>
+    </div>
 
-  <!-- Apply & Reset buttons -->
-  <div class="col-md-4 d-flex align-items-end gap-2">
-   <button type="submit" class="btn btn-main w-100 mt-2">Apply Filters</button>
-   <a href="{% url 'payments' %}" class="btn btn-main w-100 mt-2">Reset Filters</a>
-  </div>
+    <!-- Month filter -->
+    <div class="col-md-4">
+      <label class="form-label">Select Month</label>
 
- </form>
+      <input type="text" id="monthPickerDisplay" class="form-control" placeholder="Select month">
+
+      <input type="hidden" id="monthPicker" name="month"
+        value="{% if selected_month %}{{ selected_month }}{% else %}{{ current_month_date|date:'Y-m' }}{% endif %}">
+    </div>
+
+    <!-- Apply & Reset buttons -->
+    <div class="col-md-4 d-flex align-items-end gap-2">
+      <button type="submit" class="btn btn-main w-100 mt-2">Apply Filters</button>
+      <a href="{% url 'payments' %}" class="btn btn-main w-100 mt-2">Reset Filters</a>
+    </div>
+
+  </form>
 </div>
 
 <div class="dashboard-card mb-4">
- <h3 class="dashboard-title mb-3">Tenant Payment Status</h3>
+  <h3 class="dashboard-title mb-3">Tenant Payment Status</h3>
 
- <table class="table table-custom mb-0">
-  <thead>
-   <tr>
-    <th>Tenant</th>
-    <th>Property</th>
-    <th>Rent Due</th>
-    <th>Paid</th>
-    <th>Balance</th>
-    <th>Status</th>
-    <th>Add Payment</th>
-   </tr>
-  </thead>
+  <table class="table table-custom mb-0">
+    <thead>
+      <tr>
+        <th>Tenant</th>
+        <th>Property</th>
+        <th>Rent Due</th>
+        <th>Paid</th>
+        <th>Balance</th>
+        <th>Status</th>
+        <th>Add Payment</th>
+      </tr>
+    </thead>
 
-  <tbody>
-   {% for item in tenant_payment_status %}
-   <tr class="{% if item.balance > 0 %}table-danger{% else %}table-success{% endif %}">
-    <td>{{ item.tenant.name }}</td>
-    <td>{{ item.tenant.property.name }}</td>
-    <td>{{ item.rent_due|ugx }}</td>
-    <td>{{ item.paid|ugx }}</td>
+    <tbody>
+      {% for item in tenant_payment_status %}
+      <tr class="{% if item.balance > 0 %}table-danger{% else %}table-success{% endif %}">
+        <td>{{ item.tenant.name }}</td>
+        <td>{{ item.tenant.property.name }}</td>
+        <td>{{ item.rent_due|ugx }}</td>
+        <td>{{ item.paid|ugx }}</td>
 
-    <td>
-     {% if item.balance > 0 %}
-     <span class="text-danger fw-bold">{{ item.balance|ugx }}</span>
-     {% else %}
-     <span class="text-success fw-bold">0</span>
-     {% endif %}
-    </td>
+        <td>
+          {% if item.balance > 0 %}
+          <span class="text-danger fw-bold">{{ item.balance|ugx }}</span>
+          {% else %}
+          <span class="text-success fw-bold">0</span>
+          {% endif %}
+        </td>
 
-    <td>
-     <span class="badge
+        <td>
+          <span class="badge
             {% if item.status_type == 'On Time' %} bg-success
             {% elif item.status_type == 'Partial' %} bg-warning text-dark
             {% elif item.status_type == 'Missed' %} bg-danger
             {% elif item.status_type == 'Cumulative' %} bg-danger text-dark
             {% endif %}">
-      {{ item.status_type }}
-     </span>
-    </td>
+            {{ item.status_type }}
+          </span>
+        </td>
 
-    <!-- Add Payment Section -->
-    <td>
-     <a href="{% url 'add_payment' %}?tenant={{ item.tenant.id }}" class="btn btn-sm btn-main">
-      Add Payment
-     </a>
-    </td>
-   </tr>
-   {% endfor %}
-  </tbody>
+        <!-- Add Payment Section -->
+        <td>
+          <a href="{% url 'add_payment' %}?tenant={{ item.tenant.id }}" class="btn btn-sm btn-main">
+            Add Payment
+          </a>
+        </td>
+      </tr>
+      {% endfor %}
+    </tbody>
 
-  <tfoot>
-   <tr>
-    <th colspan="2">Totals:</th>
-    <th>{{ total_rent_due|ugx }}</th>
-    <th>{{ total_paid|ugx }}</th>
-    <th>{{ total_balance|ugx }}</th>
-    <th colspan="2"></th>
-   </tr>
-  </tfoot>
- </table>
+    <tfoot>
+      <tr>
+        <th colspan="2">Totals:</th>
+        <th>{{ total_rent_due|ugx }}</th>
+        <th>{{ total_paid|ugx }}</th>
+        <th>{{ total_balance|ugx }}</th>
+        <th colspan="2"></th>
+      </tr>
+    </tfoot>
+  </table>
 </div>
 
 <script src="https://cdn.jsdelivr.net/npm/flatpickr"></script>
 <script src="https://cdn.jsdelivr.net/npm/flatpickr/dist/plugins/monthSelect/index.js"></script>
 
 <script>
-flatpickr("#monthPickerDisplay", {
+  flatpickr("#monthPickerDisplay", {
     plugins: [
-        new monthSelectPlugin({
-            shorthand: false,
-            dateFormat: "Y-m",
-            altFormat: "F Y"
-        })
+      new monthSelectPlugin({
+        shorthand: false,
+        dateFormat: "Y-m",
+        altFormat: "F Y"
+      })
     ],
     defaultDate: "{% if selected_month %}{{ selected_month }}{% else %}{{ current_month_date|date:'Y-m' }}{% endif %}",
-    onChange: function(selectedDates, dateStr, instance) {
-        document.getElementById("monthPicker").value = dateStr;
-        instance.input.value = instance.formatDate(selectedDates[0], "F Y");
+    onChange: function (selectedDates, dateStr, instance) {
+      document.getElementById("monthPicker").value = dateStr;
+      instance.input.value = instance.formatDate(selectedDates[0], "F Y");
     },
-    onReady: function(selectedDates, dateStr, instance) {
-        if (selectedDates.length) {
-            instance.input.value = instance.formatDate(selectedDates[0], "F Y");
-        }
+    onReady: function (selectedDates, dateStr, instance) {
+      if (selectedDates.length) {
+        instance.input.value = instance.formatDate(selectedDates[0], "F Y");
+      }
     }
-});
+  });
 </script>
 
 {% endblock %}

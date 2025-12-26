@@ -1,4 +1,5 @@
 from django.contrib import admin
+from django.core.exceptions import PermissionDenied
 from .models import (
     Property,
     Tenant,
@@ -6,7 +7,8 @@ from .models import (
     ExpenseCategory,
     Expense,
     Employee,
-    SalaryPayment
+    TenantRent,
+    CommissionRate,
 )
 
 @admin.register(Property)
@@ -23,9 +25,39 @@ class TenantAdmin(admin.ModelAdmin):
 @admin.register(RentPayment)
 class RentPaymentAdmin(admin.ModelAdmin):
     list_display = ("tenant", "payment_month", "amount", "date_paid")
+    list_display_links = ("tenant", "payment_month") 
     list_filter = ("payment_month", "tenant__property")
     search_fields = ("tenant__name",)
+    readonly_fields = ("created_at",)
+    ordering = ("-date_paid", "-created_at")
     date_hierarchy = "payment_month"
+
+    def has_change_permission(self, request, obj=None):
+        return request.user.is_superuser
+
+    def has_delete_permission(self, request, obj=None):
+        return request.user.is_superuser
+
+    def has_add_permission(self, request):
+        return request.user.is_superuser
+
+@admin.register(TenantRent)
+class TenantRentAdmin(admin.ModelAdmin):
+    list_display = ("tenant", "effective_from", "rent_amount")
+    list_display_links = ("tenant", "effective_from")
+    list_filter = ("effective_from", "tenant__property")
+    search_fields = ("tenant__name",)
+    ordering = ("-effective_from", "tenant")
+    date_hierarchy = "effective_from"
+
+    def has_change_permission(self, request, obj=None):
+        return request.user.is_superuser
+
+    def has_delete_permission(self, request, obj=None):
+        return request.user.is_superuser
+
+    def has_add_permission(self, request):
+        return request.user.is_superuser
 
 @admin.register(Expense)
 class ExpenseAdmin(admin.ModelAdmin):
@@ -46,9 +78,8 @@ class EmployeeAdmin(admin.ModelAdmin):
     search_fields = ("name", "role", "phone")
 
 
-@admin.register(SalaryPayment)
-class SalaryPaymentAdmin(admin.ModelAdmin):
-    list_display = ("employee", "payment_month", "amount", "date_paid")
-    list_filter = ("payment_month", "employee__role")
-    search_fields = ("employee__name",)
-    date_hierarchy = "payment_month"
+
+@admin.register(CommissionRate)
+class CommissionRateAdmin(admin.ModelAdmin):
+    list_display = ("percentage", "effective_from")
+    ordering = ("-effective_from",)

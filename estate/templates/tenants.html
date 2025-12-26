@@ -1,0 +1,53 @@
+{% extends "base.html" %}
+{% load static %}
+{% load currency %}
+
+{% block content %}
+<div class="dashboard-card mb-4">
+ <div class="d-flex justify-content-between align-items-center mb-3">
+  <h2 class="dashboard-title mb-0">
+   <i class="bi bi-people-fill me-2"></i> Tenants
+  </h2>
+  <a href="{% url 'add_tenant' %}" class="btn btn-main btn-sm">
+   <i class="bi bi-plus-circle me-1"></i> Add Tenant
+  </a>
+ </div>
+
+ <table class="table table-custom mb-0">
+  <thead>
+   <tr>
+    <th>Name</th>
+    <th>Property</th>
+    <th>Monthly Rent</th>
+    <th>Start Date</th>
+    <th>Status</th>
+   </tr>
+  </thead>
+  <tbody>
+   {% for tenant in tenants %}
+   <tr>
+    <td>
+     <a href="{% url 'tenant_details' tenant.id %}">
+      {{ tenant.name }}
+     </a>
+    </td>
+    <td>{{ tenant.property.name }}</td>
+    <td>{{ tenant.monthly_rent|ugx }}</td>
+    <td>{{ tenant.start_date|date:"M Y" }}</td>
+    <td>
+     {% if tenant.active %}
+     <span class="badge bg-success">Active</span>
+     {% else %}
+     <span class="badge bg-secondary">Inactive</span>
+     {% endif %}
+    </td>
+   </tr>
+   {% empty %}
+   <tr>
+    <td colspan="5" class="text-center text-muted">No tenants found.</td>
+   </tr>
+   {% endfor %}
+  </tbody>
+ </table>
+</div>
+{% endblock %}

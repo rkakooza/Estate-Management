@@ -129,6 +129,8 @@ STATICFILES_DIRS = [
     BASE_DIR / "estate" / "static",
 ]
 
+STATIC_ROOT = BASE_DIR / "staticfiles"
+
 LOGIN_URL = "/admin/login/"
 LOGIN_REDIRECT_URL = "/dashboard/"
 

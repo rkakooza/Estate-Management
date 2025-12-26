@@ -1,237 +1,52 @@
-{% extends "base.html" %}
-{% load currency %}
+{% extends "base.html" %} {% load currency %} {% block content %}
 
-{% block content %}
-
-<div class="greeting-card mb-4">
-    <div class="greeting-title">
-        Hello,
-        {% if user.first_name %}
-            {{ user.first_name }}!
-        {% else %}
-            {{ user.username }}!
-        {% endif %}
-    </div>
-    <div class="greeting-subtitle">
-        Here is your estate overview for {{ selected_month_label }}.
-    </div>
+<div class="dashboard-card mb-4">
+  <div class="dashboard-title">Available Funds (All-Time)</div>
+  <div class="dashboard-value">{{ available_funds|ugx }}</div>
+  <p class="text-muted mt-1">
+    Net funds after all rent collections and expenses.
+  </p>
 </div>
 
-<div class="alert alert-info d-flex justify-content-between align-items-center mt-3">
-    <div>
-        <strong>Viewing:</strong>
-        {{ selected_property_name }} — {{ selected_month_label }}
-    </div>
-    <a href="/dashboard/" class="btn btn-sm btn-outline-danger">Clear Filters</a>
+<div class="dashboard-card mb-4">
+  <h3 class="dashboard-title mb-3">Quick Actions</h3>
+
+  <div class="d-flex gap-3">
+    <a href="{% url 'add_expense' %}" class="btn btn-outline-main">
+      Add Expense
+    </a>
+
+    <a href="{% url 'add_tenant' %}" class="btn btn-outline-main">
+      Add Tenant
+    </a>
+
+    <a href="{% url 'payments' %}" class="btn btn-outline-main">
+      View Payments
+    </a>
+  </div>
 </div>
 
-<form method="get" class="row mb-4">
+<div class="dashboard-card mb-4">
+  <h3 class="dashboard-title mb-3">Expenses — {{ selected_month_label }}</h3>
+
+  <div class="row">
     <div class="col-md-4">
-        <label class="form-label">Filter by Property</label>
-        <select name="property" class="form-select">
-            <option value="">All Properties</option>
-            {% for prop in all_properties %}
-            <option value="{{ prop.id }}"
-                {% if selected_property|stringformat:"s" == prop.id|stringformat:"s" %}
-                    selected
-                {% endif %}>
-                {{ prop.name }}
-            </option>
-            {% endfor %}
-        </select>
+      <strong>Recurring Expenses</strong>
+      <div class="dashboard-value">{{ recurring_expenses|ugx }}</div>
     </div>
 
     <div class="col-md-4">
-        <label class="form-label">Filter by Month</label>
-        <input type="text" id="monthPicker" name="month" class="form-control"
-               placeholder="Select month..."
-               value="{% if selected_month %}{{ selected_month }}{% else %}{{ current_month_date|date:'Y-m' }}{% endif %}">
+      <strong>One-Time Expenses</strong>
+      <div class="dashboard-value">{{ one_time_expenses|ugx }}</div>
     </div>
 
-    <div class="col-md-4 d-flex align-items-end">
-        <button type="submit" class="btn btn-main w-100 mt-2">Apply Filters</button>
+    <div class="col-md-4">
+      <strong>Total Expenses</strong>
+      <div class="dashboard-value">
+        {{ recurring_expenses|add:one_time_expenses|ugx }}
+      </div>
     </div>
-</form>
-
-<div class="grid grid-3 mb-4">
-    <div class="dashboard-card">
-        <div class="dashboard-title">Total Rent</div>
-        <div class="dashboard-value">{{ total_rent|ugx }}</div>
-    </div>
-
-    <div class="dashboard-card">
-        <div class="dashboard-title">Total Expenses</div>
-        <div class="dashboard-value">{{ total_expenses|ugx }}</div>
-    </div>
-
-    <div class="dashboard-card">
-        <div class="dashboard-title">Available Funds (All-Time)</div>
-        <div class="dashboard-value">{{ available_funds|ugx }}</div>
-        <p class="text-muted mt-1">Total cumulative funds.</p>
-    </div>
+  </div>
 </div>
-
-<div class="dashboard-card mb-4">
-    <h3 class="dashboard-title mb-3">Per-Property Summary</h3>
-    <table class="table table-custom">
-        <thead>
-            <tr>
-                <th>Property</th>
-                <th>Total Rent</th>
-                <th>Total Expenses</th>
-                <th>Profit</th>
-            </tr>
-        </thead>
-        <tbody>
-            {% for prop in property_summaries %}
-            <tr>
-                <td>{{ prop.name }}</td>
-                <td>{{ prop.rent_total|ugx }}</td>
-                <td>{{ prop.expense_total|ugx }}</td>
-                <td>{{ prop.profit|ugx }}</td>
-            </tr>
-            {% endfor %}
-        </tbody>
-    </table>
-</div>
-
-<div class="dashboard-card mb-4">
-    <h3 class="dashboard-title mb-3">Monthly Financial Summary</h3>
-    <table class="table table-custom">
-        <thead>
-            <tr>
-                <th>Month</th>
-                <th>Total Rent</th>
-                <th>Total Expenses</th>
-                <th>Profit</th>
-            </tr>
-        </thead>
-        <tbody>
-            {% for m in monthly_data %}
-            <tr>
-                <td>{{ m.month|date:"F Y" }}</td>
-                <td>{{ m.rent|ugx }}</td>
-                <td>{{ m.expense|ugx }}</td>
-                <td>{{ m.profit|ugx }}</td>
-            </tr>
-            {% endfor %}
-        </tbody>
-    </table>
-</div>
-
-<div class="dashboard-card mb-4">
-    <h3 class="dashboard-title mb-3">Tenants Late This Month</h3>
-    {% if late_tenants %}
-        <ul class="list-group">
-            {% for t in late_tenants %}
-            <li class="list-group-item d-flex justify-content-between align-items-center">
-                <span><strong>{{ t.name }}</strong> — {{ t.property.name }}</span>
-                <span class="text-muted">(Rent: {{ t.monthly_rent|ugx }})</span>
-            </li>
-            {% endfor %}
-        </ul>
-    {% else %}
-        <p class="text-success">No tenants are late this month.</p>
-    {% endif %}
-</div>
-
-<div class="dashboard-card mb-4">
-    <h3 class="dashboard-title mb-3">Outstanding Tenants</h3>
-    <table class="table table-custom">
-        <thead>
-            <tr>
-                <th>Tenant</th>
-                <th>Property</th>
-                <th>Missed Months</th>
-                <th>Status</th>
-                <th>Balance Due</th>
-            </tr>
-        </thead>
-        <tbody>
-            {% for item in tenant_payment_status %}
-                {% if item.balance > 0 %}
-                <tr>
-                    <td>{{ item.tenant.name }}</td>
-                    <td>{{ item.tenant.property.name }}</td>
-                    <td>
-                        {% for m in item.missed_month_names %}
-                            <span class="badge bg-danger">{{ m }}</span>
-                        {% endfor %}
-                    </td>
-                    <td>{{ item.status_type }}</td>
-                    <td class="text-danger fw-bold">{{ item.balance|ugx }}</td>
-                </tr>
-                {% endif %}
-            {% endfor %}
-        </tbody>
-    </table>
-</div>
-
-<div class="dashboard-card mb-4">
-    <h3 class="dashboard-title mb-3">Tenant Payment Breakdown</h3>
-    <table class="table table-custom">
-        <thead>
-            <tr>
-                <th>Tenant</th>
-                <th>Property</th>
-                <th>Rent Due</th>
-                <th>Paid</th>
-                <th>Balance</th>
-                <th>Status</th>
-                <th>Add Payment</th>
-            </tr>
-        </thead>
-        <tbody>
-            {% for item in tenant_payment_status %}
-            <tr class="{% if item.balance > 0 %}table-danger{% else %}table-success{% endif %}">
-                <td>{{ item.tenant.name }}</td>
-                <td>{{ item.tenant.property.name }}</td>
-                <td>{{ item.rent_due|ugx }}</td>
-                <td>{{ item.paid|ugx }}</td>
-                <td>
-                    {% if item.balance > 0 %}
-                        <span class="text-danger fw-bold">{{ item.balance|ugx }}</span>
-                    {% else %}
-                        <span class="text-success fw-bold">0</span>
-                    {% endif %}
-                </td>
-                <td>{{ item.status_type }}</td>
-                <td>
-                    <a href="/admin/estate/rentpayment/add/?tenant={{ item.tenant.id }}" class="btn btn-sm btn-main">
-                        Add Payment
-                    </a>
-                </td>
-            </tr>
-            {% endfor %}
-        </tbody>
-        <tfoot>
-            <tr>
-                <th colspan="2">Totals:</th>
-                <th>{{ total_rent_due|ugx }}</th>
-                <th>{{ total_paid|ugx }}</th>
-                <th>{{ total_balance|ugx }}</th>
-                <th colspan="2"></th>
-            </tr>
-        </tfoot>
-    </table>
-</div>
-
-<div class="dashboard-card mb-4">
-    <h3 class="dashboard-title">Expense Breakdown</h3>
-    <p><strong>Recurring:</strong> {{ recurring_expenses|ugx }}</p>
-    <p><strong>One-Time:</strong> {{ one_time_expenses|ugx }}</p>
-</div>
-
-<div class="chart-card mb-4">
-    <h3 class="dashboard-title mb-3">Monthly Rent, Expenses & Profit</h3>
-    <canvas id="combinedChart" height="140"></canvas>
-</div>
-
-<script>
-    flatpickr("#monthPicker", {
-        plugins: [new monthSelectPlugin({ shorthand:true, dateFormat:"Y-m", altFormat:"F Y" })],
-        defaultDate: "{% if selected_month %}{{ selected_month }}{% else %}{{ current_month_date|date:'Y-m' }}{% endif %}"
-    });
-</script>
 
 {% endblock %}

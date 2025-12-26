@@ -1,0 +1,78 @@
+{% extends "base.html" %}
+{% load currency %}
+
+{% block content %}
+
+<div class="dashboard-card mb-4">
+  <h2 class="dashboard-title mb-3">
+    <i class="bi bi-clock-history me-2"></i> Payment History
+  </h2>
+  <form method="get" class="row mb-3">
+    <div class="col-md-3">
+      <label class="form-label">Filter by Tenant</label>
+      <select name="tenant" class="form-select" onchange="this.form.submit()">
+        <option value="">All Tenants</option>
+        {% for t in all_tenants %}
+        <option value="{{ t.id }}" {% if tenant and tenant.id == t.id %}selected{% endif %}>
+          {{ t.name }} — {{ t.property.name }}
+        </option>
+        {% endfor %}
+      </select>
+    </div>
+
+    <div class="col-md-2 d-flex align-items-end">
+      <a href="{% url 'payments_history_csv' %}{% if tenant %}?tenant={{ tenant.id }}{% endif %}"
+        class="btn btn-outline-main btn-sm w-100">
+        <i class="bi bi-download me-1"></i> Export CSV
+      </a>
+    </div>
+  </form>
+
+  {% if tenant %}
+  <p class="text-muted mb-3">
+    Showing payment history for
+    <strong>{{ tenant.name }}</strong>
+    ({{ tenant.property.name }})
+  </p>
+  {% else %}
+  <p class="text-muted mb-3">
+    Showing all payments (most recent first)
+  </p>
+  {% endif %}
+
+  {% if payments %}
+  <table class="table table-custom table-hover align-middle">
+    <thead class="sticky-top">
+      <tr>
+        <th>Tenant</th>
+        <th>Property</th>
+        <th>Date Paid</th>
+        <th>Payment For</th>
+        
+        
+        <th class="text-end">Amount (UGX)</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for p in payments %}
+      <tr>
+        <td>{{ p.tenant.name }}</td>
+        <td>{{ p.tenant.property.name }}</td>
+        <td>{{ p.date_paid|date:"M d, Y" }}</td>
+        <td>{{ p.payment_month|date:"F Y" }}</td>
+        
+        
+        <td class="text-end fw-bold text-success">{{ p.amount|ugx }}</td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  <p class="text-muted mt-2">
+    Payments are listed in reverse chronological order.
+  </p>
+  {% else %}
+  <p class="text-muted">No payments found.</p>
+  {% endif %}
+</div>
+
+{% endblock %}

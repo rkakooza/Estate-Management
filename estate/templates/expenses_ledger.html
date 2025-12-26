@@ -1,0 +1,160 @@
+{% extends "base.html" %}
+{% load currency %}
+{% load expense_extras %}
+
+{% block title %}Expenses{% endblock %}
+
+{% block content %}
+<div class="dashboard-card mb-4">
+
+  <div class="d-flex justify-content-between align-items-center mb-3">
+    <h2 class="dashboard-title mb-0">
+      Expenses — {{ selected_month_label }}
+    </h2>
+
+    <div class="d-flex gap-2">
+      <a href="{% url 'add_expense' %}" class="btn btn-outline-main btn-sm">
+        Add Expense
+      </a>
+
+      <a href="{% url 'employees_list' %}" class="btn btn-outline-main btn-sm">
+        Employees
+      </a>
+
+      <a href="{% url 'add_employee' %}" class="btn btn-outline-main btn-sm">
+        Add Employee
+      </a>
+    </div>
+  </div>
+
+  <!-- Filters -->
+  <form method="get" class="row g-2 mb-4">
+    <!-- <div class="col-md-4">
+      <select name="month" class="form-select">
+        {% for m in month_choices %}
+        <option value="{{ m.value }}" {% if selected_month == m.value %}selected{% endif %}>
+          {{ m.label }}
+        </option>
+        {% endfor %}
+      </select>
+    </div> -->
+    <div class="col-md-4">
+      <input type="text" id="monthPickerDisplay" class="form-control" placeholder="Select month…" readonly />
+    
+      <input type="hidden" id="monthPicker" name="month" value="{{ selected_month }}" />
+      </div>
+
+    <div class="col-md-4">
+      <select name="property" class="form-select">
+        <option value="">All Properties</option>
+        {% for prop in all_properties %}
+        <option value="{{ prop.id }}" {% if selected_property == prop.id|stringformat:"s" %}selected{% endif %}>
+          {{ prop.name }}
+        </option>
+        {% endfor %}
+      </select>
+    </div>
+
+    <div class="col-md-2">
+      <button type="submit" class="btn btn-outline-main w-100">
+        Filter
+      </button>
+    </div>
+  </form>
+
+  <!-- Totals -->
+  <div class="row mb-4">
+    <div class="col-md-4">
+      <strong>Recurring</strong>
+      <div class="dashboard-value">{{ recurring_total|ugx }}</div>
+    </div>
+
+    <div class="col-md-4">
+      <strong>One-Time</strong>
+      <div class="dashboard-value">{{ one_time_total|ugx }}</div>
+    </div>
+
+    <div class="col-md-4">
+      <strong>Total</strong>
+      <div class="dashboard-value">{{ total_expenses|ugx }}</div>
+    </div>
+  </div>
+
+  <!-- Ledger Table -->
+  <div class="table-responsive">
+    <table class="table table-striped align-middle">
+      <thead>
+        <tr>
+          <th>Date</th>
+          <th>Description</th>
+          <th>Property</th>
+          <th>Category</th>
+          <th>Type</th>
+          <th class="text-end">Amount</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for e in expenses %}
+        <tr>
+          <td>{{ e.date|date:"Y-m-d" }}</td>
+          <td>{{ e.description|clean_salary_label }}</td>
+          <td>{{ e.property.name }}</td>
+          <td>
+            {% if e.category %}
+            {{ e.category.name }}
+            {% else %}
+            <span class="text-muted">—</span>
+            {% endif %}
+          </td>
+          <td>
+            {% if e.is_recurring %}
+            <span class="badge bg-success">Recurring</span>
+            {% else %}
+            <span class="badge bg-secondary">One-time</span>
+            {% endif %}
+          </td>
+          <td class="text-end">
+            {{ e.amount|ugx }}
+          </td>
+        </tr>
+        {% empty %}
+        <tr>
+          <td colspan="6" class="text-center text-muted py-4">
+            No expenses recorded for this month.
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+  flatpickr("#monthPickerDisplay", {
+    plugins: [
+      new monthSelectPlugin({
+        shorthand: false,
+        dateFormat: "Y-m",
+        altFormat: "F Y"
+      })
+    ],
+    defaultDate: "{{ selected_month|default:'' }}",
+    onChange: function (selectedDates, dateStr, instance) {
+      document.getElementById("monthPicker").value = dateStr;
+      instance.input.value = instance.formatDate(selectedDates[0], "F Y");
+
+      const url = new URL(window.location.href);
+      url.searchParams.set("month", dateStr);
+      window.location.href = url.toString();
+    },
+    onReady: function (selectedDates, dateStr, instance) {
+      if (selectedDates.length) {
+        instance.input.value = instance.formatDate(selectedDates[0], "F Y");
+      }
+    }
+  });
+</script>
+{% endblock %}
