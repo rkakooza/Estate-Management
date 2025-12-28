@@ -11,6 +11,9 @@ from decimal import Decimal, InvalidOperation
 import csv
 from estate.models import TenantRent
 from django.shortcuts import get_object_or_404
+from django.contrib.auth import authenticate, login
+from django.contrib.auth.views import LogoutView
+from django.contrib import messages
 
 from .models import (
     RentPayment,
@@ -22,6 +25,28 @@ from .models import (
     Employee,
     EmployeeSalary,
 )
+from django.dispatch import receiver
+from django.contrib.auth.views import PasswordChangeView
+from django.urls import reverse_lazy
+
+        
+def login_view(request):
+    if request.user.is_authenticated:
+        return redirect("dashboard")
+
+    if request.method == "POST":
+        username = request.POST.get("username")
+        password = request.POST.get("password")
+
+        user = authenticate(request, username=username, password=password)
+
+        if user is not None:
+            login(request, user)
+            return redirect("dashboard")
+        else:
+            messages.error(request, "Invalid username or password.")
+
+    return render(request, "login.html")
 
 def get_commission_rate_for_date(date_paid: date) -> Decimal:
     """
@@ -447,8 +472,56 @@ def dashboard(request):
 
 
 
+@login_required
 def analytics_view(request):
-    return render(request, "analytics.html")
+    """
+    Minimal, read-only analytics view.
+    Uses pure helper functions from analytics.py.
+    """
+    from .analytics import (
+        get_all_time_funds,
+        get_month_snapshot,
+        get_expense_breakdown,
+    )
+
+    # --- Parse selected month (YYYY-MM) ---
+    selected_month = request.GET.get("month")
+    today = date.today().replace(day=1)
+
+    if selected_month:
+        try:
+            parsed = datetime.strptime(selected_month, "%Y-%m")
+            month_date = parsed.date().replace(day=1)
+        except ValueError:
+            month_date = today
+    else:
+        month_date = today
+
+    # --- Analytics data ---
+    all_time = get_all_time_funds()
+    monthly = get_month_snapshot(month_date)
+    expense_breakdown = get_expense_breakdown(month_date)
+
+    context = {
+        # Month
+        "selected_month": month_date.strftime("%Y-%m"),
+        "selected_month_label": month_date.strftime("%B %Y"),
+
+        # All‑time
+        "all_time_rent": all_time["total_rent"],
+        "all_time_expenses": all_time["total_expenses"],
+        "available_funds": all_time["available_funds"],
+
+        # Monthly snapshot
+        "monthly_rent": monthly["rent"],
+        "monthly_expenses": monthly["expenses"],
+        "monthly_net": monthly["net"],
+
+        # Expense breakdown
+        "expense_breakdown": expense_breakdown,
+    }
+
+    return render(request, "analytics.html", context)
 
 
 def payments_page(request):
@@ -1594,12 +1667,6 @@ def expenses_ledger(request):
 
     return render(request, "expenses_ledger.html", context)
 
-# ------------------- Start of Settings View-------------------
-def settings_view(request):
-    return render(request, "settings.html")
-# ------------------- End of Settings View-------------------
-
-
 # ------------------- Add Expense View -------------------
 @login_required
 def add_expense(request):
@@ -1721,26 +1788,31 @@ def toggle_employee_active(request, employee_id):
     return redirect("employees_list")
 
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 # Legacy alias if needed (optional)
 payments_view = payments_page
+
+
+class ForcePasswordChangeView(PasswordChangeView):
+    template_name = "password_change.html"
+    success_url = reverse_lazy("dashboard")
+
+    def form_valid(self, form):
+        response = super().form_valid(form)
+        if hasattr(self.request.user, "userprofile"):
+            self.request.user.userprofile.must_change_password = False
+            self.request.user.userprofile.save()
+
+        messages.success(
+            self.request,
+            "Your password has been updated successfully."
+        )
+        return response
+    
+
+
+def forgot_password_view(request):
+    """
+    Static guidance page for users who forgot their password.
+    Passwords are reset by an administrator.
+    """
+    return render(request, "forgot_password.html")

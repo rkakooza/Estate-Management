@@ -11,6 +11,74 @@ from .models import (
     CommissionRate,
 )
 
+from django.contrib.auth.models import User
+from django.utils.crypto import get_random_string
+from django.contrib import messages
+from django.contrib.auth.admin import UserAdmin as DjangoUserAdmin
+from django.utils.safestring import mark_safe
+
+def reset_user_password(modeladmin, request, queryset):
+    """
+    Admin action: reset user password to a temporary one
+    and force password change on next login.
+    """
+    if not request.user.is_superuser:
+        raise PermissionDenied
+
+    for user in queryset:
+        temp_password = get_random_string(length=10)
+        user.set_password(temp_password)
+        user.save()
+
+        # Force password change on next login
+        if hasattr(user, "userprofile"):
+            user.userprofile.must_change_password = True
+            user.userprofile.save()
+
+        messages.success(
+            request,
+            mark_safe(
+                f"""
+                <strong>Temporary password for {user.username}:</strong>
+                <code id="temp-pass-{user.id}">{temp_password}</code>
+                <button type="button"
+                        style="margin-left:8px"
+                        onclick="navigator.clipboard.writeText('{temp_password}')">
+                    Copy
+                </button>
+                <div style="font-size:12px;color:#FFEB3B;margin-top:4px;">
+                    Copy now — this password will not be shown again.
+                </div>
+                """
+            )
+        )
+
+reset_user_password.short_description = "Reset password (generate temporary password)"
+
+admin.site.unregister(User)
+
+@admin.register(User)
+class UserAdmin(DjangoUserAdmin):
+    actions = [reset_user_password]
+
+admin.site.site_header = "Estate Management Admin"
+admin.site.site_title = "Estate Admin"
+admin.site.index_title = "Administration"
+
+# THIS is the important line
+admin.site.site_url = "/dashboard/"
+
+class SuperuserOnlyAdminSite(admin.AdminSite):
+    site_header = "Estate Management Admin"
+
+    def has_permission(self, request):
+        if not request.user.is_authenticated:
+            return True
+        return request.user.is_superuser
+
+
+admin_site = SuperuserOnlyAdminSite(name="superadmin")
+
 @admin.register(Property)
 class PropertyAdmin(admin.ModelAdmin):
     list_display = ("name", "location", "created_at")

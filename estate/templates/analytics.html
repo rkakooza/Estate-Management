@@ -1,0 +1,119 @@
+{% extends "base.html" %}
+{% load currency %}
+
+{% block title %}Analytics{% endblock %}
+
+{% block content %}
+<div class="container-fluid py-4">
+
+ <h2 class="mb-4">Analytics</h2>
+
+ <!-- Month Selector -->
+ <div class="mb-4">
+  <label class="form-label fw-semibold">Select Month</label>
+  <input type="text" id="monthPickerDisplay" class="form-control" style="max-width: 220px;" readonly />
+ </div>
+
+ <!-- All-time funds -->
+ <div class="row mb-4">
+  <div class="col-md-4">
+   <div class="card shadow-sm">
+    <div class="card-body">
+     <h6 class="text-muted">All-time Available Funds</h6>
+     <h4 class="fw-bold">{{ available_funds|ugx }}</h4>
+    </div>
+   </div>
+  </div>
+ </div>
+
+ <!-- Monthly snapshot -->
+ <div class="row mb-4">
+  <div class="col-md-4">
+   <div class="card shadow-sm">
+    <div class="card-body">
+     <h6 class="text-muted">Rent Collected ({{ selected_month_label }})</h6>
+     <h5 class="fw-semibold">{{ monthly_rent|ugx }}</h5>
+    </div>
+   </div>
+  </div>
+
+  <div class="col-md-4">
+   <div class="card shadow-sm">
+    <div class="card-body">
+     <h6 class="text-muted">Expenses ({{ selected_month_label }})</h6>
+     <h5 class="fw-semibold">{{ monthly_expenses|ugx }}</h5>
+    </div>
+   </div>
+  </div>
+
+  <div class="col-md-4">
+   <div class="card shadow-sm">
+    <div class="card-body">
+     <h6 class="text-muted">Net Result ({{ selected_month_label }})</h6>
+     <h5 class="fw-semibold">
+      {% if monthly_net >= 0 %}
+      <span class="text-success">{{ monthly_net|ugx }}</span>
+      {% else %}
+      <span class="text-danger">{{ monthly_net|ugx }}</span>
+      {% endif %}
+     </h5>
+    </div>
+   </div>
+  </div>
+ </div>
+
+ <!-- Expense breakdown -->
+ <div class="card shadow-sm">
+  <div class="card-body">
+   <h5 class="mb-3">Expense Breakdown — {{ selected_month_label }}</h5>
+
+   {% if expense_breakdown %}
+   <table class="table table-sm align-middle">
+    <thead>
+     <tr>
+      <th>Category</th>
+      <th class="text-end">Total</th>
+     </tr>
+    </thead>
+    <tbody>
+     {% for row in expense_breakdown %}
+     <tr>
+      <td>{{ row.category }}</td>
+      <td class="text-end">{{ row.total|ugx }}</td>
+     </tr>
+     {% endfor %}
+    </tbody>
+   </table>
+   {% else %}
+   <p class="text-muted mb-0">No expenses recorded for this month.</p>
+   {% endif %}
+  </div>
+ </div>
+
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+ flatpickr("#monthPickerDisplay", {
+  plugins: [
+   new monthSelectPlugin({
+    shorthand: false,
+    dateFormat: "Y-m",
+    altFormat: "F Y"
+   })
+  ],
+  defaultDate: "{{ selected_month }}",
+  onReady: function (selectedDates, dateStr, instance) {
+   if (selectedDates.length) {
+    instance.input.value = instance.formatDate(selectedDates[0], "F Y");
+   }
+  },
+  onChange: function (selectedDates, dateStr) {
+   const url = new URL(window.location.href);
+   url.searchParams.set("month", dateStr);
+   window.location.href = url.toString();
+  }
+ });
+</script>
+{% endblock %}

@@ -17,9 +17,12 @@ Including another URLconf
 from django.contrib import admin
 from django.urls import path
 from estate import views
-from django.contrib.auth import views as auth_views
+from estate.admin import admin_site
+from estate.views import ForcePasswordChangeView
+from django.contrib.auth.views import LogoutView
 
 urlpatterns = [
+    path("login/", views.login_view, name="login"),
     path('admin/', admin.site.urls),
     path('dashboard/', views.dashboard, name='dashboard'),
     path('analytics/', views.analytics_view, name='analytics'),
@@ -39,7 +42,20 @@ urlpatterns = [
     path("tenants/add/", views.add_tenant, name="add_tenant"),
     path('tenants/<int:tenant_id>/toggle-active/', views.toggle_tenant_active, name='toggle_tenant_active'),
     path("tenants/<int:tenant_id>/edit/", views.edit_tenant, name="edit_tenant"),
-    path('settings/', views.settings_view, name='settings'),
-    path("logout/", auth_views.LogoutView.as_view(next_page="/admin/login/", http_method_names=["get"]),
-    name="logout"),
+    path("logout/", LogoutView.as_view(next_page="/login/"), name="logout"),
+    path("forgot-password/", views.forgot_password_view, name="forgot_password"),
+]
+
+
+urlpatterns += [
+    path(
+        "password/change/",
+        ForcePasswordChangeView.as_view(),
+        name="password_change",
+    ),
+    path(
+        "password/change/done/",
+        ForcePasswordChangeView.as_view(),
+        name="password_change_done",
+    ),
 ]

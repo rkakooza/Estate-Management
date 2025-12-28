@@ -1,0 +1,45 @@
+{% extends "base.html" %}
+{% block body_class %}no-auth-layout{% endblock %}
+
+{% block content %}
+<div class="container d-flex justify-content-center align-items-center" style="min-height: 80vh;">
+ <div class="card shadow-sm" style="width: 100%; max-width: 400px;">
+  <div class="card-body">
+   <h4 class="card-title text-center mb-4">Login</h4>
+
+   {% if form.errors %}
+   <div class="alert alert-danger">
+    Invalid username or password.
+   </div>
+   {% endif %}
+
+   <form method="post">
+    {% csrf_token %}
+
+    <div class="mb-3">
+     <label for="id_username" class="form-label">Username</label>
+     <input type="text" name="username" class="form-control" id="id_username" required autofocus>
+    </div>
+
+    <div class="mb-3">
+     <label for="id_password" class="form-label">Password</label>
+     <input type="password" name="password" class="form-control" id="id_password" required>
+    </div>
+
+    <div class="d-grid">
+     <button type="submit" class="btn btn-primary">
+      Sign in
+     </button>
+    </div>
+
+    <div class="text-center mt-3">
+     <a href="{% url 'forgot_password' %}" class="text-muted small">
+      Forgot password?
+     </a>
+    </div>
+
+   </form>
+  </div>
+ </div>
+</div>
+{% endblock %}
