@@ -4,95 +4,95 @@
 
 {% block content %}
 <div class="dashboard-card mb-4" style="max-width: 700px; margin: auto;">
- <h2 class="dashboard-title mb-3">
-  Add Expense
- </h2>
+  <h2 class="dashboard-title mb-3">
+    Add Expense
+  </h2>
 
- {% if error %}
- <div class="alert alert-danger">
-  {{ error }}
- </div>
- {% endif %}
-
- <form method="post">
-  {% csrf_token %}
-
-  <!-- Amount -->
-  <div class="mb-3">
-   <label class="form-label">Amount</label>
-   <input type="number" name="amount" class="form-control" step="0.01" min="0.01" required
-    value="{{ form_data.amount|default:'' }}">
+  {% if error %}
+  <div class="alert alert-danger">
+    {{ error }}
   </div>
+  {% endif %}
 
-  <!-- Description -->
-  <div class="mb-3">
-   <label class="form-label">Description</label>
-   <input type="text" name="description" class="form-control" placeholder="e.g. Electricity bill, Plumbing repair"
-    required value="{{ form_data.description|default:'' }}">
-  </div>
+  <form method="post">
+    {% csrf_token %}
 
-  <!-- Expense Type -->
-  <div class="mb-3">
-   <label class="form-label">Expense Type</label>
-   <select name="expense_type" class="form-select" required>
-    <option value="">-- Select --</option>
-    <option value="recurring" {% if form_data.expense_type == "recurring" %}selected{% endif %}>
-     Recurring (monthly)
-    </option>
-    <option value="one_time" {% if form_data.expense_type == "one_time" %}selected{% endif %}>
-     One-time
-    </option>
-   </select>
-  </div>
+    <!-- Amount -->
+    <div class="mb-3">
+      <label class="form-label">Amount</label>
+      <input type="number" name="amount" class="form-control" step="0.01" min="0.01" required
+        value="{{ form_data.amount|default:'' }}">
+    </div>
 
-  <!-- Property -->
-  <div class="mb-3">
-   <label class="form-label">Property</label>
-   <select name="property" class="form-select" required>
-    <option value="">-- Select Property --</option>
-    {% for prop in properties %}
-    <option value="{{ prop.id }}" {% if form_data.property == prop.id|stringformat:"s" %}selected{% endif %}>
-     {{ prop.name }}
-    </option>
-    {% endfor %}
-   </select>
-  </div>
+    <!-- Description -->
+    <div class="mb-3">
+      <label class="form-label">Description</label>
+      <input type="text" name="description" class="form-control" placeholder="e.g. Electricity bill, Plumbing repair"
+        required value="{{ form_data.description|default:'' }}">
+    </div>
 
-  <!-- Category (optional) -->
-  <div class="mb-3">
-   <label class="form-label">
-    Category <span class="text-muted">(optional)</span>
-   </label>
-   <select name="category" class="form-select">
-    <option value="">-- None --</option>
-    {% for cat in categories %}
-    <option value="{{ cat.id }}" {% if form_data.category == cat.id|stringformat:"s" %}selected{% endif %}>
-     {{ cat.name }}
-    </option>
-    {% endfor %}
-   </select>
-  </div>
+    <!-- Expense Type -->
+    <div class="mb-3">
+      <label class="form-label">Expense Type</label>
+      <select name="expense_type" class="form-select" required>
+        <option value="">-- Select --</option>
+        <option value="recurring" {% if form_data.expense_type == "recurring" %}selected{% endif %}>
+          Recurring (monthly)
+        </option>
+        <option value="one_time" {% if form_data.expense_type == "one_time" %}selected{% endif %}>
+          One-time
+        </option>
+      </select>
+    </div>
 
-  <!-- Date -->
-  <div class="mb-3">
-   <label class="form-label">Expense Date</label>
-   <input type="date" name="date" class="form-control" value="{{ form_data.date|default:'' }}">
-   <small class="text-muted">
-    Leave blank to use today’s date.
-   </small>
-  </div>
+    <!-- Property -->
+    <div class="mb-3">
+      <label class="form-label">Property</label>
+      <select name="property" class="form-select" required>
+        <option value="">-- Select Property --</option>
+        {% for prop in properties %}
+        <option value="{{ prop.id }}" {% if form_data.property == prop.id|stringformat:"s" %}selected{% endif %}>
+          {{ prop.name }}
+        </option>
+        {% endfor %}
+      </select>
+    </div>
 
-  <!-- Actions -->
-  <div class="d-flex gap-3 mt-4">
-   <button type="submit" class="btn btn-main">
-    Save Expense
-   </button>
+    <!-- Category (optional) -->
+    <div class="mb-3">
+      <label class="form-label">
+        Category <span class="text-muted">(optional)</span>
+      </label>
+      <select name="category" class="form-select">
+        <option value="">-- None --</option>
+        {% for cat in categories %}
+        <option value="{{ cat.id }}" {% if form_data.category == cat.id|stringformat:"s" %}selected{% endif %}>
+          {{ cat.name }}
+        </option>
+        {% endfor %}
+      </select>
+    </div>
 
-   <a href="{% url 'dashboard' %}" class="btn btn-outline-main">
-    Cancel
-   </a>
-  </div>
+    <!-- Date -->
+    <div class="mb-3">
+      <label class="form-label">Expense Date</label>
+      <input type="date" name="date" class="form-control" value="{{ form_data.date|default:'' }}">
+      <small class="text-muted">
+        Leave blank to use today’s date.
+      </small>
+    </div>
 
- </form>
+    <!-- Actions -->
+    <div class="d-flex gap-3 mt-4">
+      <button type="submit" class="btn btn-main">
+        Save Expense
+      </button>
+
+      <a href="{% url 'dashboard' %}" class="btn btn-outline-main">
+        Cancel
+      </a>
+    </div>
+
+  </form>
 </div>
 {% endblock %}

@@ -24,6 +24,7 @@ from .models import (
     CommissionRate,
     Employee,
     EmployeeSalary,
+    OtherIncome,
 )
 from django.dispatch import receiver
 from django.contrib.auth.views import PasswordChangeView
@@ -135,9 +136,15 @@ def build_tenant_payment_status(tenants_qs, current_month_date):
         # Selected month stats
         paid_selected = paid_by_month.get(selected_month_start, 0)
         due_selected = get_rent_for_month(tenant, selected_month_start)
-        remaining_selected = due_selected - paid_selected
 
-        partial_selected = paid_selected > 0 and paid_selected < due_selected
+        # Safety: Month before tenant start
+        if due_selected is None:
+            due_selected = Decimal("0")
+            remaining_selected = Decimal("0")
+            partial_selected = False
+        else:
+            remaining_selected = due_selected - paid_selected
+            partial_selected = paid_selected > 0 and paid_selected < due_selected
 
         # Evaluate all scheduled months up to the selected month (inclusive)
         # and compute cumulative outstanding accurately month-by-month.
@@ -148,6 +155,10 @@ def build_tenant_payment_status(tenants_qs, current_month_date):
         for m in _iter_month_starts(tenant_start_month, selected_month_start):
             paid_m = paid_by_month.get(m, 0)
             rent_m = get_rent_for_month(tenant, m)
+            # Safety skip for months with no applicable rent
+            if rent_m is None:
+                continue
+
             remaining_m = rent_m - paid_m
 
             if remaining_m > 0:
@@ -300,10 +311,15 @@ def dashboard(request):
     all_time_rent = (
         RentPayment.objects.aggregate(total=models.Sum("amount"))["total"] or 0
     )
+
+    all_time_other_income = (
+        OtherIncome.objects.aggregate(total=models.Sum("amount"))["total"] or 0
+    )
+
     all_time_expenses = (
         Expense.objects.aggregate(total=models.Sum("amount"))["total"] or 0
     )
-    available_funds = all_time_rent - all_time_expenses
+    available_funds = (all_time_rent + all_time_other_income  - all_time_expenses)
 
     # ---------------------------------------------------------
     # 6. Active tenants (respect property filter)
@@ -1694,7 +1710,7 @@ def add_expense(request):
             return render(request, "add_expense.html", {
                 "properties": properties,
                 "categories": categories,
-                "error": "Amount must be a positive number.",
+                "error": "Expense amount must be a positive number.",
                 "form_data": request.POST,
             })
 

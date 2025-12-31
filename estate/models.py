@@ -2,6 +2,8 @@ from django.db import models
 from django.contrib.auth.models import User
 from django.db.models.signals import post_save
 from django.dispatch import receiver
+from django.core.validators import MinValueValidator
+from decimal import Decimal
 
 
 
@@ -153,7 +155,7 @@ class Expense(models.Model):
         help_text="Month this expense is booked to (first day of month).",
     )
 
-    amount = models.DecimalField(max_digits=10, decimal_places=2)
+    amount = models.DecimalField(max_digits=12, decimal_places=2, validators=[MinValueValidator(Decimal("0.01"))])
     date = models.DateField()
 
     # recurring: electricity, water, garbage, internet
@@ -256,3 +258,36 @@ class UserProfile(models.Model):
 def create_user_profile(sender, instance, created, **kwargs):
     if created:
         UserProfile.objects.create(user=instance)
+
+
+
+class OtherIncome(models.Model):
+    """
+    Non-rental income
+    Admin-only entry. Amount must be positive.
+    """
+    amount = models.DecimalField(
+        max_digits=12,
+        decimal_places=2,
+        validators=[MinValueValidator(Decimal("0.01"))],
+    )
+    date = models.DateField()
+    description = models.CharField(max_length=255)
+
+    # Optional: if income is tied to a specific property
+    property = models.ForeignKey(
+        "Property",
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="other_incomes",
+    )
+
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ("-date", "-id")
+
+    def __str__(self):
+        prop = self.property.name if self.property else "No Property"
+        return f"{self.date} — {self.description} — {self.amount} ({prop})"

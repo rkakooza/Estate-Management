@@ -40,9 +40,9 @@
     </div> -->
     <div class="col-md-4">
       <input type="text" id="monthPickerDisplay" class="form-control" placeholder="Select month…" readonly />
-    
+
       <input type="hidden" id="monthPicker" name="month" value="{{ selected_month }}" />
-      </div>
+    </div>
 
     <div class="col-md-4">
       <select name="property" class="form-select">
@@ -65,7 +65,7 @@
   <!-- Totals -->
   <div class="row mb-4">
     <div class="col-md-4">
-      <strong>Recurring</strong>
+      <strong>Recurring Expenses</strong>
       <div class="dashboard-value">{{ recurring_total|ugx }}</div>
     </div>
 
@@ -75,7 +75,7 @@
     </div>
 
     <div class="col-md-4">
-      <strong>Total</strong>
+      <strong>Total Expenses</strong>
       <div class="dashboard-value">{{ total_expenses|ugx }}</div>
     </div>
   </div>

@@ -11,7 +11,7 @@
 <div class="dashboard-card mb-4">
   <h3 class="dashboard-title mb-3">Quick Actions</h3>
 
-  <div class="d-flex gap-3">
+  <div class="d-flex gap-3 flex-wrap">
     <a href="{% url 'add_expense' %}" class="btn btn-outline-main">
       Add Expense
     </a>
@@ -22,6 +22,10 @@
 
     <a href="{% url 'payments' %}" class="btn btn-outline-main">
       View Payments
+    </a>
+
+    <a href="{% url 'employees_list' %}" class="btn btn-outline-main">
+      View Employees
     </a>
   </div>
 </div>

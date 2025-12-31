@@ -7,8 +7,10 @@ from .models import (
     ExpenseCategory,
     Expense,
     Employee,
+    EmployeeSalary,
     TenantRent,
     CommissionRate,
+    OtherIncome,
 )
 
 from django.contrib.auth.models import User
@@ -126,6 +128,22 @@ class TenantRentAdmin(admin.ModelAdmin):
 
     def has_add_permission(self, request):
         return request.user.is_superuser
+    
+@admin.register(EmployeeSalary)
+class EmployeeSalaryAdmin(admin.ModelAdmin):
+    list_display = ("employee", "salary_amount", "effective_from")
+    list_filter = ("effective_from", "employee")
+    search_fields = ("employee__name",)
+    ordering = ("-effective_from",)
+
+    def has_add_permission(self, request):
+        return request.user.is_superuser
+
+    def has_change_permission(self, request, obj=None):
+        return request.user.is_superuser
+
+    def has_delete_permission(self, request, obj=None):
+        return request.user.is_superuser
 
 @admin.register(Expense)
 class ExpenseAdmin(admin.ModelAdmin):
@@ -134,6 +152,22 @@ class ExpenseAdmin(admin.ModelAdmin):
     search_fields = ("notes",)
     date_hierarchy = "date"
    
+@admin.register(OtherIncome)
+class OtherIncomeAdmin(admin.ModelAdmin):
+    list_display = ("date", "amount", "property", "description", "created_at")
+    list_filter = ("date", "property")
+    search_fields = ("description",)
+    ordering = ("-date", "-created_at")
+
+    def has_add_permission(self, request):
+        return request.user.is_superuser
+
+    def has_change_permission(self, request, obj=None):
+        return request.user.is_superuser
+
+    def has_delete_permission(self, request, obj=None):
+        return request.user.is_superuser
+
 @admin.register(ExpenseCategory)
 class ExpenseCategoryAdmin(admin.ModelAdmin):
     list_display = ("name", "description")
