@@ -20,8 +20,10 @@ from estate import views
 from estate.admin import admin_site
 from estate.views import ForcePasswordChangeView
 from django.contrib.auth.views import LogoutView
+from django.shortcuts import redirect
 
 urlpatterns = [
+    path("", lambda request: redirect("login"), name="root"),
     path("login/", views.login_view, name="login"),
     path('admin/', admin.site.urls),
     path('dashboard/', views.dashboard, name='dashboard'),
