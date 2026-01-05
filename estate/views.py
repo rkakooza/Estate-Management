@@ -54,14 +54,14 @@ def get_commission_rate_for_date(date_paid: date) -> Decimal:
     Returns the commission percentage applicable on the given payment date.
     Falls back to 0 if no rate is configured.
     """
-    rate = (
+    row = (
         CommissionRate.objects
         .filter(effective_from__lte=date_paid.replace(day=1))
         .order_by("-effective_from")
-        .values_list("percentage", flat=True)
+        .values_list("percentage")
         .first()
     )
-    return Decimal(rate) if rate is not None else Decimal("0")
+    return row[0] if row else Decimal("0")
 
 def _month_start(d: date) -> date:
     """Normalize any date/datetime to the first day of its month (date)."""
@@ -82,23 +82,26 @@ def _iter_month_starts(start_month: date, end_month: date):
 
 
 def get_rent_for_month(tenant, month_date):
-    return (
+    row = (
         TenantRent.objects
         .filter(tenant=tenant, effective_from__lte=month_date)
         .order_by("-effective_from")
-        .values_list("rent_amount", flat=True)
-        .first())
+        .values_list("rent_amount")
+        .first()
+    )
+    return row[0] if row else Decimal("0")
 
 def get_salary_for_month(employee, month_date):
     month_start = month_date.replace(day=1)
 
-    return (
+    row = (
         EmployeeSalary.objects
         .filter(employee=employee, effective_from__lte=month_start)
         .order_by("-effective_from")
-        .values_list("salary_amount", flat=True)
+        .values_list("salary_amount")
         .first()
     )
+    return row[0] if row else None
 
 def build_tenant_payment_status(tenants_qs, current_month_date):
 
