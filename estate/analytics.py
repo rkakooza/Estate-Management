@@ -6,7 +6,7 @@ Pure aggregation only — no side effects, no writes.
 from datetime import date, datetime
 from decimal import Decimal
 from django.db.models import Sum
-from .models import Expense, RentPayment
+from .models import Expense, RentPayment, OtherIncome
 
 
 def _month_start(d):
@@ -24,14 +24,21 @@ def get_all_time_funds():
         RentPayment.objects.aggregate(total=Sum("amount"))["total"]
         or Decimal("0")
     )
+
+    total_other_income = (
+        OtherIncome.objects.aggregate(total=Sum("amount"))["total"]
+        or Decimal("0")
+    )
+    
     total_expenses = (
         Expense.objects.aggregate(total=Sum("amount"))["total"]
         or Decimal("0")
     )
     return {
         "total_rent": total_rent,
+        "total_other_income": total_other_income,
         "total_expenses": total_expenses,
-        "available_funds": total_rent - total_expenses,
+        "available_funds": total_rent + total_other_income - total_expenses,
     }
 
 

@@ -528,6 +528,7 @@ def analytics_view(request):
 
         # All‑time
         "all_time_rent": all_time["total_rent"],
+        "all_time_other_income": all_time["total_other_income"],
         "all_time_expenses": all_time["total_expenses"],
         "available_funds": all_time["available_funds"],
 
