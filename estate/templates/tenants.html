@@ -32,7 +32,7 @@
      </a>
     </td>
     <td>{{ tenant.property.name }}</td>
-    <td>{{ tenant.monthly_rent|ugx }}</td>
+    <td>{{ tenant.current_rent|default:tenant.monthly_rent|ugx }}</td>
     <td>{{ tenant.start_date|date:"M Y" }}</td>
     <td>
      {% if tenant.active %}

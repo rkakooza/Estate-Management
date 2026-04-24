@@ -1,5 +1,6 @@
 from django.shortcuts import render, redirect
 from django.db import models
+from django.db.models import OuterRef, Subquery
 from django.db import transaction
 from django.db.models.functions import TruncMonth
 from datetime import date, datetime
@@ -1004,9 +1005,22 @@ def payments_history_csv(request):
 # ------------------- Start of Tenants View-------------------
 @login_required
 def tenants_view(request):
+    today_month = date.today().replace(day=1)
+    
+    latest_rent = (
+        TenantRent.objects
+        .filter(
+            tenant=OuterRef("pk"),
+            effective_from__lte=today_month,
+        )
+        .order_by("-effective_from")
+        .values("rent_amount")[:1]
+    )
+
     tenants = (
         Tenant.objects
         .select_related("property")
+        .annotate(current_rent=Subquery(latest_rent))
         .order_by("property__name", "name")
     )
 
