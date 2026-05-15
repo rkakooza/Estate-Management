@@ -38,8 +38,8 @@
         <div class="dropdown">
           <a class="nav-link dropdown-toggle d-flex align-items-center" href="#" id="userDropdown" role="button"
             data-bs-toggle="dropdown">
-            {% if user.first_name %}{{ user.first_name }} {% else %}{{ user.username }}{% endif %} {% if
-            user.is_superuser %}<span class="badge bg-danger ms-2">Admin</span>{% endif %}
+            {% if user.first_name %}{{ user.first_name }}{% else %}{{ user.username }}{% endif %}
+            {% if user.is_superuser %}<span class="badge bg-danger ms-2">Admin</span>{% endif %}
           </a>
 
           <ul class="dropdown-menu dropdown-menu-end">
@@ -47,16 +47,17 @@
             <li><a class="dropdown-item" href="/admin/">Admin Panel</a></li>
             {% endif %}
             <li>
-            <li><a class="dropdown-item" href="{% url 'password_change' %}">
+              <a class="dropdown-item" href="{% url 'password_change' %}">
                 Change Password
               </a>
             </li>
-            <form method="post" action="{% url 'logout' %}">
-              {% csrf_token %}
-              <button type="submit" class="dropdown-item text-danger">
-                Logout
-              </button>
-            </form>
+            <li>
+              <form method="post" action="{% url 'logout' %}">
+                {% csrf_token %}
+                <button type="submit" class="dropdown-item text-danger">
+                  Logout
+                </button>
+              </form>
             </li>
           </ul>
         </div>
@@ -126,7 +127,7 @@
     </nav>
     <!-- end sidebar -->
   </div>
-
+  {% endif %}
 
   {% if messages %}
   <div class="container mt-3">
