@@ -13,9 +13,14 @@ https://docs.djangoproject.com/en/5.2/ref/settings/
 from pathlib import Path
 from dotenv import load_dotenv
 import os
-from urllib.parse import urlparse
+import dj_database_url
 
 load_dotenv()
+
+
+def env_bool(name, default=False):
+    return os.getenv(name, str(default)).lower() in {"1", "true", "yes", "on"}
+
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
@@ -24,13 +29,30 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 # Quick-start development settings - unsuitable for production
 # See https://docs.djangoproject.com/en/5.2/howto/deployment/checklist/
 
-# SECURITY WARNING: keep the secret key used in production secret!
-SECRET_KEY = 'django-insecure-%+4j$fq@a!o=^#fjz7^1upo4(h-f%-t8wpxpbbu=4e!()+p!k='
+LOCAL_SECRET_KEY = 'django-insecure-%+4j$fq@a!o=^#fjz7^1upo4(h-f%-t8wpxpbbu=4e!()+p!k='
 
 # SECURITY WARNING: don't run with debug turned on in production!
-DEBUG = os.getenv("DEBUG", "False") == "True"
+DEBUG = env_bool("DEBUG", False)
 
-ALLOWED_HOSTS = os.getenv("ALLOWED_HOSTS", "127.0.0.1,localhost").split(",")
+# SECURITY WARNING: keep the secret key used in production secret.
+SECRET_KEY = os.getenv("SECRET_KEY")
+if not SECRET_KEY:
+    if DEBUG:
+        SECRET_KEY = LOCAL_SECRET_KEY
+    else:
+        raise RuntimeError("SECRET_KEY must be set when DEBUG=False.")
+
+ALLOWED_HOSTS = os.getenv("ALLOWED_HOSTS", "127.0.0.1,localhost,.vercel.app").split(",")
+CSRF_TRUSTED_ORIGINS = [
+    origin.strip()
+    for origin in os.getenv("CSRF_TRUSTED_ORIGINS", "").split(",")
+    if origin.strip()
+]
+
+SECURE_PROXY_SSL_HEADER = ("HTTP_X_FORWARDED_PROTO", "https")
+SECURE_SSL_REDIRECT = env_bool("SECURE_SSL_REDIRECT", not DEBUG)
+SESSION_COOKIE_SECURE = not DEBUG
+CSRF_COOKIE_SECURE = not DEBUG
 
 
 # Application definition
@@ -89,17 +111,12 @@ if not DATABASE_URL:
         "Set it in your environment or .env file."
     )
 
-url = urlparse(DATABASE_URL)
-
 DATABASES = {
-    "default": {
-        "ENGINE": "django.db.backends.postgresql",
-        "NAME": url.path[1:],
-        "USER": url.username,
-        "PASSWORD": url.password,
-        "HOST": url.hostname,
-        "PORT": url.port or 5432,
-    }
+    "default": dj_database_url.parse(
+        DATABASE_URL,
+        conn_max_age=0,
+        ssl_require=not DEBUG,
+    )
 }
 
 
@@ -138,9 +155,6 @@ USE_TZ = True
 # https://docs.djangoproject.com/en/5.2/howto/static-files/
 
 STATIC_URL = '/static/'
-STATICFILES_DIRS = [
-    BASE_DIR / "estate" / "static",
-]
 
 STATIC_ROOT = BASE_DIR / "staticfiles"
 
