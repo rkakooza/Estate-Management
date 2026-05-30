@@ -7,17 +7,14 @@
       "use": "@vercel/python"
     },
     {
-      "src": "vercel_build.sh",
-      "use": "@vercel/static-build",
-      "config": {
-        "distDir": "staticfiles"
-      }
+      "src": "estate/static/**",
+      "use": "@vercel/static"
     }
   ],
   "routes": [
     {
       "src": "/static/(.*)",
-      "dest": "/$1"
+      "dest": "/estate/static/$1"
     },
     {
       "src": "/(.*)",
