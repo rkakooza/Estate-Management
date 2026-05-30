@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-DUMP_FILE="${1:-render_backup.dump}"
+DUMP_FILE="${1:-estate_backup.dump}"
 
 if [[ -z "${DATABASE_URL:-}" ]]; then
   echo "DATABASE_URL must be set to the target database connection string." >&2
