@@ -4,18 +4,13 @@
   "builds": [
     {
       "src": "estate_project/wsgi.py",
-      "use": "@vercel/python"
-    },
-    {
-      "src": "estate/static/**",
-      "use": "@vercel/static"
+      "use": "@vercel/python",
+      "config": {
+        "includeFiles": "staticfiles/**"
+      }
     }
   ],
   "routes": [
-    {
-      "src": "/static/(.*)",
-      "dest": "/estate/static/$1"
-    },
     {
       "src": "/(.*)",
       "dest": "estate_project/wsgi.py"
