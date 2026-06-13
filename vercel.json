@@ -1,18 +1,21 @@
 {
   "version": 2,
   "buildCommand": "bash vercel_build.sh",
-  "functions": {
-    "estate_project/wsgi.py": {
-      "includeFiles": "staticfiles/**"
-    }
-  },
   "builds": [
     {
       "src": "estate_project/wsgi.py",
       "use": "@vercel/python"
+    },
+    {
+      "src": "estate/static/**",
+      "use": "@vercel/static"
     }
   ],
   "routes": [
+    {
+      "src": "/static/(.*)",
+      "dest": "/estate/static/$1"
+    },
     {
       "src": "/(.*)",
       "dest": "estate_project/wsgi.py"
