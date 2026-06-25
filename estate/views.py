@@ -1402,6 +1402,128 @@ def add_employee(request):
         "properties": properties,
     })
 
+# ------------------- Edit Employee View -------------------
+@login_required
+def edit_employee(request, employee_id):
+    """
+    Edit employee core details and optionally schedule a salary change.
+    Salary changes are non-retroactive and apply from the selected month forward.
+    """
+    employee = get_object_or_404(Employee, id=employee_id)
+    properties = Property.objects.all().order_by("name")
+    today_month = date.today().replace(day=1)
+
+    current_salary_entry = (
+        EmployeeSalary.objects
+        .filter(employee=employee, effective_from__lte=today_month)
+        .order_by("-effective_from")
+        .first()
+    )
+    current_salary = (
+        current_salary_entry.salary_amount
+        if current_salary_entry
+        else employee.monthly_salary
+    )
+    current_salary_effective = (
+        current_salary_entry.effective_from
+        if current_salary_entry
+        else employee.start_date
+    )
+
+    context = {
+        "employee": employee,
+        "properties": properties,
+        "current_salary": current_salary,
+        "current_salary_effective": current_salary_effective,
+    }
+
+    if request.method == "GET":
+        return render(request, "edit_employee.html", context)
+
+    with transaction.atomic():
+        employee.name = request.POST.get("name", employee.name).strip()
+        employee.role = request.POST.get("role", employee.role).strip()
+        employee.phone = request.POST.get("phone", employee.phone).strip()
+
+        property_id = request.POST.get("property")
+        if property_id:
+            employee.property_id = int(property_id)
+
+        start_date_raw = request.POST.get("start_date")
+        if start_date_raw:
+            try:
+                employee.start_date = datetime.strptime(start_date_raw, "%Y-%m-%d").date()
+            except ValueError:
+                context.update({
+                    "error": "Invalid start date.",
+                    "form_data": request.POST,
+                })
+                return render(request, "edit_employee.html", context)
+
+        new_salary_raw = request.POST.get("new_salary")
+        effective_month_raw = request.POST.get("salary_effective_month")
+
+        if new_salary_raw or effective_month_raw:
+            if not new_salary_raw or not effective_month_raw:
+                context.update({
+                    "error": "Both a new salary and an effective month are required to schedule a salary change.",
+                    "form_data": request.POST,
+                })
+                return render(request, "edit_employee.html", context)
+
+            try:
+                new_salary = Decimal(new_salary_raw)
+                if new_salary <= 0:
+                    raise InvalidOperation
+            except (InvalidOperation, TypeError):
+                context.update({
+                    "error": "Salary amount must be greater than zero.",
+                    "form_data": request.POST,
+                })
+                return render(request, "edit_employee.html", context)
+
+            try:
+                effective_month = (
+                    datetime.strptime(effective_month_raw, "%Y-%m")
+                    .date()
+                    .replace(day=1)
+                )
+            except (TypeError, ValueError):
+                context.update({
+                    "error": "Invalid salary effective month.",
+                    "form_data": request.POST,
+                })
+                return render(request, "edit_employee.html", context)
+
+            if effective_month < today_month:
+                context.update({
+                    "error": "Salary changes must start from the current or a future month.",
+                    "form_data": request.POST,
+                })
+                return render(request, "edit_employee.html", context)
+
+            salary_obj = (
+                EmployeeSalary.objects
+                .filter(employee=employee, effective_from=effective_month)
+                .first()
+            )
+
+            if salary_obj:
+                salary_obj.salary_amount = new_salary
+                salary_obj.save()
+            else:
+                EmployeeSalary.objects.create(
+                    employee=employee,
+                    salary_amount=new_salary,
+                    effective_from=effective_month,
+                )
+
+            employee.monthly_salary = new_salary
+
+        employee.save()
+
+    return redirect("employees_list")
+
 # ------------------- Pay Salary View -------------------
 @login_required
 def pay_salary(request, employee_id):
@@ -1789,16 +1911,26 @@ def add_expense(request):
 @login_required
 def employees_list(request):
     """
-    Read-only list of employees.
+    List employees. Active employees are shown by default; former employees are
+    available through a filter so employment history is preserved.
     Salaries are paid via Expense records.
     """
-    employees = (
-        Employee.objects
-        .order_by("name")
-    )
+    status = request.GET.get("status", "active")
+
+    if status == "former":
+        employees = Employee.objects.filter(active=False).order_by("name")
+    elif status == "all":
+        employees = Employee.objects.order_by("name")
+    else:
+        status = "active"
+        employees = Employee.objects.filter(active=True).order_by("name")
 
     context = {
         "employees": employees,
+        "status": status,
+        "active_count": Employee.objects.filter(active=True).count(),
+        "former_count": Employee.objects.filter(active=False).count(),
+        "all_count": Employee.objects.count(),
     }
 
     return render(request, "employees_list.html", context)

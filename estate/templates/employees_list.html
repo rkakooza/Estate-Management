@@ -7,7 +7,23 @@
 {% block content %}
 <div class="dashboard-card mb-4">
  <div class="d-flex justify-content-between align-items-center mb-3">
-  <h2 class="dashboard-title mb-0">Employees</h2>
+  <div>
+   <h2 class="dashboard-title mb-1">Employees</h2>
+   <div class="btn-group btn-group-sm" role="group" aria-label="Employee status filter">
+    <a href="{% url 'employees_list' %}"
+     class="btn {% if status == 'active' %}btn-main{% else %}btn-outline-main{% endif %}">
+     Active ({{ active_count }})
+    </a>
+    <a href="{% url 'employees_list' %}?status=former"
+     class="btn {% if status == 'former' %}btn-main{% else %}btn-outline-main{% endif %}">
+     Former ({{ former_count }})
+    </a>
+    <a href="{% url 'employees_list' %}?status=all"
+     class="btn {% if status == 'all' %}btn-main{% else %}btn-outline-main{% endif %}">
+     All ({{ all_count }})
+    </a>
+   </div>
+  </div>
 
   <div class="d-flex gap-2">
    <a href="{% url 'add_employee' %}" class="btn btn-outline-main btn-sm">
@@ -41,29 +57,33 @@
       {% endif %}
      </td>
      <td>
-      {% if e.active %}
+     {% if e.active %}
       <span class="badge bg-success">Active</span>
       {% else %}
-      <span class="badge bg-secondary">Inactive</span>
+      <span class="badge bg-secondary">Former</span>
       {% endif %}
      </td>
      <td class="text-end">{{ e.monthly_salary|ugx }}</td>
      <td class="text-end">
+      <a href="{% url 'edit_employee' e.id %}" class="btn btn-sm btn-outline-main">
+       Edit
+      </a>
+
       {% if e.active %}
-      <a href="{% url 'pay_salary' e.id %}" class="btn btn-sm btn-outline-main">
+      <a href="{% url 'pay_salary' e.id %}" class="btn btn-sm btn-outline-main ms-1">
        Pay Salary
       </a>
 
       <form method="post" action="{% url 'toggle_employee_active' e.id %}" style="display:inline;">
        {% csrf_token %}
        <button type="submit" class="btn btn-sm btn-outline-danger ms-1">
-        Deactivate
+        End Employment
        </button>
       </form>
       {% else %}
       <form method="post" action="{% url 'toggle_employee_active' e.id %}" style="display:inline;">
        {% csrf_token %}
-       <button type="submit" class="btn btn-sm btn-outline-success">
+       <button type="submit" class="btn btn-sm btn-outline-success ms-1">
         Reactivate
        </button>
       </form>
@@ -73,7 +93,7 @@
     {% empty %}
     <tr>
      <td colspan="5" class="text-center text-muted py-4">
-      No employees added yet.
+      No employees found for this filter.
      </td>
     </tr>
     {% endfor %}
