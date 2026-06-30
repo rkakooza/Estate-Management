@@ -81,6 +81,21 @@ def _iter_month_starts(start_month: date, end_month: date):
         m = (m + relativedelta(months=1)).replace(day=1)
 
 
+def parse_money(value):
+    """
+    Parse user-entered money safely.
+    Accepts plain decimals and comma-separated amounts like 1,000,000.
+    """
+    if value is None:
+        raise InvalidOperation
+
+    normalized = str(value).strip().replace(",", "")
+    if not normalized:
+        raise InvalidOperation
+
+    return Decimal(normalized)
+
+
 
 def get_rent_for_month(tenant, month_date):
     row = (
@@ -417,7 +432,8 @@ def dashboard(request):
             payment_month__month=current_month_date.month,
         ).aggregate(total=models.Sum("amount"))
         total_paid_for_month = payments["total"] or 0
-        if total_paid_for_month < tenant.monthly_rent:
+        rent_due_for_month = get_rent_for_month(tenant, current_month_date)
+        if total_paid_for_month < rent_due_for_month:
             late_tenants.append(tenant)
 
     late_payments = len(late_tenants)
@@ -775,7 +791,7 @@ def add_payment(request):
 
         # Parse amount to Decimal
         try:
-            amount = Decimal(amount_raw)
+            amount = parse_money(amount_raw)
         except (TypeError, InvalidOperation):
             amount = Decimal("0")
 
@@ -1065,7 +1081,7 @@ def add_tenant(request):
             })
 
         try:
-            initial_rent = Decimal(rent_raw)
+            initial_rent = parse_money(rent_raw)
             if initial_rent <= 0:
                 raise InvalidOperation
         except (InvalidOperation, ValueError):
@@ -1163,7 +1179,7 @@ def edit_tenant(request, tenant_id):
 
             if rent_amount_raw and effective_month_raw:
                 try:
-                    new_rent = Decimal(rent_amount_raw)
+                    new_rent = parse_money(rent_amount_raw)
                     # Normalize effective_month to first of month (accounting rule)
                     effective_month = datetime.strptime(
                         effective_month_raw, "%Y-%m"
@@ -1356,7 +1372,7 @@ def add_employee(request):
             })
 
         try:
-            salary_amount = Decimal(salary_raw)
+            salary_amount = parse_money(salary_raw)
             if salary_amount <= 0:
                 raise InvalidOperation
         except (InvalidOperation, TypeError):
@@ -1472,7 +1488,7 @@ def edit_employee(request, employee_id):
                 return render(request, "edit_employee.html", context)
 
             try:
-                new_salary = Decimal(new_salary_raw)
+                new_salary = parse_money(new_salary_raw)
                 if new_salary <= 0:
                     raise InvalidOperation
             except (InvalidOperation, TypeError):
@@ -1562,22 +1578,24 @@ def pay_salary(request, employee_id):
                 },
             )
 
-        # ---- BLOCK DOUBLE SALARY PAYMENTS ----
-        # salary_label = f"Salary — {employee.name} ({salary_month.strftime('%B %Y')})"
-
-        # already_paid = Expense.objects.filter(
-        #     description=salary_label,
-        # ).exists()
         salary_category = ExpenseCategory.objects.filter(name__iexact="salary").first()
+        if not salary_category:
+            salary_category = ExpenseCategory.objects.create(name="Salary")
 
         marker = f"[Emp #{employee.id}]"
         salary_label = f"Salary — {employee.name} {marker} ({salary_month.strftime('%B %Y')})"
 
-        already_paid = Expense.objects.filter(
-            category=salary_category,
-            date=salary_month,               # salary month (ledger month)
-            description__contains=marker,     # stable even if name changes
-        ).exists()
+        already_paid = (
+            Expense.objects.filter(
+                employee=employee,
+                expense_month=salary_month,
+                category=salary_category,
+            ).exists()
+            or Expense.objects.filter(
+                date=salary_month,
+                description__contains=marker,
+            ).exists()
+        )
 
         if already_paid:
             return render(
@@ -1600,11 +1618,11 @@ def pay_salary(request, employee_id):
 
         # Create salary expense
         Expense.objects.create(
-            # employee=employee,
+            employee=employee,
+            expense_month=salary_month,
             amount=salary_amount,
             description=salary_label,
             is_recurring=False,
-            # date=date_paid,
             date=salary_month,
             property=employee.property,
             category=salary_category,
@@ -1615,12 +1633,14 @@ def pay_salary(request, employee_id):
     # GET: Determine default salary month (same UX rule as tenants)
     month_raw = request.GET.get("month")
 
+    marker = f"[Emp #{employee.id}]"
+
     # --- Determine default salary month (same UX rule as tenants) ---
     last_paid_expense = (
         Expense.objects
         .filter(
-            category__name__iexact="salary",
-            description__startswith=f"Salary — {employee.name} ("
+            models.Q(employee=employee)
+            | models.Q(description__contains=marker)
         )
         .order_by("-date")
         .first()
@@ -1650,8 +1670,8 @@ def pay_salary(request, employee_id):
     last_paid_expense = (
         Expense.objects
         .filter(
-            category__name__iexact="salary",
-            description__startswith=f"Salary — {employee.name} ("
+            models.Q(employee=employee)
+            | models.Q(description__contains=marker)
         )
         .order_by("-date")
         .first()
@@ -1695,7 +1715,7 @@ def change_salary(request, employee_id):
         return redirect("pay_salary", employee_id=employee.id)
 
     try:
-        new_salary = Decimal(new_salary_raw)
+        new_salary = parse_money(new_salary_raw)
         if new_salary <= 0:
             raise InvalidOperation
     except (InvalidOperation, TypeError):
@@ -1843,7 +1863,7 @@ def add_expense(request):
 
         # --- Validation ---
         try:
-            amount = Decimal(amount_raw)
+            amount = parse_money(amount_raw)
             if amount <= 0:
                 raise InvalidOperation
         except (InvalidOperation, TypeError):
